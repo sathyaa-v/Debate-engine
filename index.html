@@ -6,1288 +6,308 @@
 <title>The Debate Engine — Two AIs Argue So You Don't Have To Guess</title>
 <meta name="description" content="A multi-agent AI system where two agents argue opposite sides of a question and a neutral judge decides who's right. Plain-English explainer, live simulator, and full source code.">
 
-<!-- Fonts -->
+<!-- Fonts (optional — the page falls back to system fonts if offline) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+<!-- jQuery -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <!-- Three.js (classic global build) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-
 <style>
-/* ============================================================
-   The Debate Engine — styles (no Tailwind)
-   ============================================================ */
+/* =========================================================
+   THE DEBATE ENGINE — single-file styles
+   No Tailwind. No build step. Plain CSS, hand-written.
+   ========================================================= */
 
 :root {
-  --void: #0A0D17;
-  --panel: #121729;
+  --void:   #0A0D17;
+  --panel:  #121729;
   --panel2: #1A2036;
-  --line: rgba(255, 255, 255, 0.08);
-  --ink: #F3F1EA;
-  --muted: #95A0B8;
-  --pro: #F2954A;
-  --con: #2FD3C4;
-  --judge: #E8C468;
-  --font-display: "Fraunces", serif;
-  --font-body: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
-  --nav-h: 4rem;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --line:   rgba(255,255,255,0.08);
+  --ink:    #F3F1EA;
+  --muted:  #95A0B8;
+  --pro:    #F2954A;
+  --con:    #2FD3C4;
+  --judge:  #E8C468;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
-
-html {
-  scroll-behavior: smooth;
-}
-
 body {
-  margin: 0;
-  background: var(--void);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  margin: 0; background: var(--void); color: var(--ink);
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
 }
+h1, h2, h3, h4, p, ul, ol, figure { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+select { font: inherit; }
+code { font-family: 'JetBrains Mono', monospace; }
+::selection { background: var(--pro); color: var(--void); }
 
-img,
-canvas {
-  display: block;
-  max-width: 100%;
-}
+/* ---------- accessibility helpers ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 100; background: var(--judge); color: var(--void); padding: 0.75rem 1.25rem; font-weight: 600; }
+.skip-link:focus { left: 1rem; top: 1rem; border-radius: 0.5rem; }
+a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--judge); outline-offset: 3px; border-radius: 4px; }
+.is-hidden { display: none !important; }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+/* ---------- layout primitives ---------- */
+.wrap { width: 100%; margin-inline: auto; }
+.wrap--sm { max-width: 48rem; }
+.wrap--md { max-width: 56rem; }
+.wrap--lg { max-width: 64rem; }
+.wrap--xl { max-width: 72rem; }
+.center { text-align: center; }
 
-button {
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
+.section { position: relative; padding: 6rem 1.25rem; }
+@media (min-width: 640px) { .section { padding-block: 8rem; } }
+.section--panel { background: var(--panel); }
+.section--divider { border-top: 1px solid var(--line); }
 
-ul,
-ol {
-  margin: 0;
-  padding: 0;
-}
+.kicker { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--judge); }
 
-code,
-pre {
-  font-family: var(--font-mono);
-}
+.section-title { font-family: 'Fraunces', Georgia, serif; font-size: 1.9rem; line-height: 1.15; margin-top: 0.75rem; margin-bottom: 1rem; }
+@media (min-width: 640px) { .section-title { font-size: 2.3rem; } }
+.section-title--narrow { max-width: 42rem; }
+.section-title--mb-lg { margin-bottom: 1.5rem; }
+.section-title--gap { margin-bottom: 3.25rem; }
 
-/* ---------- Accessibility ---------- */
-.skip-link {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  z-index: 100;
-  padding: 0.75rem 1.25rem;
-  background: var(--pro);
-  color: var(--void);
-  font-weight: 600;
-}
-.skip-link:focus {
-  left: 1rem;
-  top: 1rem;
-}
+.lede { color: var(--muted); font-size: 1.1rem; line-height: 1.7; max-width: 42rem; }
+.lede--gap-lg { margin-bottom: 3.25rem; }
+.lede--gap-xl { margin-bottom: 3.75rem; }
+.lede--spaced { margin-top: 1.5rem; }
+.lede--center { margin-inline: auto; }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* micro color/type utilities (plain CSS, not a framework) */
+.text-pro { color: var(--pro); }
+.text-con { color: var(--con); }
+.text-judge { color: var(--judge); }
+.text-ink { color: var(--ink); }
+.italic { font-style: italic; }
+.not-italic { font-style: normal; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
 
-/* ---------- Typography helpers ---------- */
-.font-display {
-  font-family: var(--font-display);
-}
-.font-body {
-  font-family: var(--font-body);
-}
-.font-mono {
-  font-family: var(--font-mono);
-}
-.font-medium {
-  font-weight: 500;
-}
+/* ---------- nav ---------- */
+#site-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; transition: background-color .3s ease, backdrop-filter .3s ease; }
+#site-nav.is-scrolled { background: rgba(10, 13, 23, 0.82); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.nav-inner { max-width: 72rem; margin-inline: auto; padding: 0 1.25rem; display: flex; align-items: center; justify-content: space-between; height: 4rem; }
+@media (min-width: 768px) { .nav-inner { padding: 0 2rem; } }
 
-.kicker {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+.brand { display: flex; align-items: center; gap: 0.5rem; }
+.brand__text { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; font-size: 1.125rem; }
 
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
+.nav-desktop { display: none; align-items: center; gap: 2rem; font-size: 0.875rem; color: var(--muted); }
+@media (min-width: 768px) { .nav-desktop { display: flex; } }
+.nav-link { position: relative; transition: color .2s ease; }
+.nav-link:hover { color: var(--ink); }
+.nav-link::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 1px; background: var(--judge); transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
+.nav-link:hover::after { transform: scaleX(1); }
 
-.dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  vertical-align: middle;
+.nav-toggle { width: 2.25rem; height: 2.25rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+@media (min-width: 768px) { .nav-toggle { display: none; } }
+.burger-line { width: 20px; height: 2px; background: var(--ink); display: block; transition: transform .2s ease, opacity .2s ease; }
+
+.mobile-menu { display: none; background: rgba(18, 23, 41, 0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--line); }
+.mobile-menu.is-open { display: block; }
+@media (min-width: 768px) { .mobile-menu { display: none !important; } }
+.mobile-menu__nav { display: flex; flex-direction: column; padding: 1rem 1.25rem; gap: 1rem; font-size: 1rem; }
+.mobile-nav-link { color: var(--ink); padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+
+/* ---------- logo mark ---------- */
+.gavel-mark { position: relative; width: 22px; height: 18px; display: inline-block; }
+.gavel-mark__pro, .gavel-mark__con { position: absolute; top: 0; width: 11px; height: 18px; border-radius: 2px; }
+.gavel-mark__pro { left: 0; background: var(--pro); clip-path: polygon(0 30%, 100% 0, 100% 100%, 0 70%); }
+.gavel-mark__con { right: 0; background: var(--con); clip-path: polygon(0 0, 100% 30%, 100% 70%, 0 100%); }
+
+/* ---------- buttons ---------- */
+.btn-primary { background: var(--judge); color: var(--void); font-weight: 600; font-size: 0.95rem; padding: 0.85rem 1.6rem; border-radius: 999px; transition: transform .18s ease, box-shadow .18s ease; display: inline-block; white-space: nowrap; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -8px rgba(232,196,104,0.55); }
+.btn-primary:disabled { opacity: 0.6; cursor: default; transform: none; box-shadow: none; }
+.btn-ghost { color: var(--ink); font-size: 0.95rem; padding: 0.85rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.25); transition: border-color .2s ease, color .2s ease; display: inline-block; }
+.btn-ghost:hover { border-color: var(--judge); color: var(--judge); }
+
+/* ---------- hero ---------- */
+.hero { position: relative; min-height: 100svh; min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.hero__canvas-wrap { position: absolute; inset: 0; z-index: 0; }
+#arena-canvas { width: 100%; height: 100%; display: block; }
+.hero-vignette {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 35%, transparent 0%, rgba(10,13,23,0.35) 55%, rgba(10,13,23,0.96) 100%),
+    linear-gradient(to bottom, rgba(10,13,23,0.15), rgba(10,13,23,0.55) 70%, #0A0D17 100%);
 }
+.hero__content { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 5rem 1.25rem 2.5rem; }
+
+.eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; margin-bottom: 1.25rem; opacity: 0; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; margin-right: 4px; }
 .dot--pro { background: var(--pro); }
 .dot--con { background: var(--con); }
 .dot--judge { background: var(--judge); }
 
-em.italic {
-  font-style: italic;
-}
-.not-italic {
-  font-style: normal;
-}
+.hero__title { font-family: 'Fraunces', Georgia, serif; font-size: 2.6rem; line-height: 1.05; max-width: 56rem; opacity: 0; }
+@media (min-width: 640px) { .hero__title { font-size: 3.75rem; } }
+@media (min-width: 768px) { .hero__title { font-size: 4.5rem; } }
+.hero__break { display: none; }
+@media (min-width: 640px) { .hero__break { display: block; } }
 
-/* ---------- Layout primitives ---------- */
-.container {
-  width: 100%;
-  max-width: 72rem;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 1.25rem;
-  padding-right: 1.25rem;
-}
+.hero__subtitle { margin-top: 1.5rem; max-width: 36rem; color: var(--muted); font-size: 1rem; line-height: 1.7; opacity: 0; }
+@media (min-width: 640px) { .hero__subtitle { font-size: 1.125rem; } }
 
-.section {
-  position: relative;
-  padding: 6rem 1.25rem;
-  border-top: 1px solid var(--line);
-}
-.section--panel {
-  background: var(--panel);
-}
-@media (min-width: 640px) {
-  .section {
-    padding-top: 8rem;
-    padding-bottom: 8rem;
-  }
-}
+.hero__cta { margin-top: 2.25rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; opacity: 0; }
+@media (min-width: 640px) { .hero__cta { flex-direction: row; } }
 
-.max-w-xl  { max-width: 36rem; }
-.max-w-2xl { max-width: 42rem; }
-.max-w-3xl { max-width: 48rem; }
-.max-w-4xl { max-width: 56rem; }
-.max-w-5xl { max-width: 64rem; }
-.max-w-6xl { max-width: 72rem; }
-.mx-auto   { margin-left: auto; margin-right: auto; }
-.text-center { text-align: center; }
+.hero__scroll-wrap { position: relative; z-index: 2; padding-bottom: 1.5rem; display: flex; justify-content: center; opacity: 0; }
+.scroll-cue { width: 1px; height: 40px; background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent); position: relative; }
+.scroll-cue::after { content: ""; position: absolute; top: 0; left: -2px; width: 5px; height: 5px; border-radius: 999px; background: var(--judge); animation: cueDrop 2.2s ease-in-out infinite; }
+@keyframes cueDrop { 0% { top: 0; opacity: 0; } 30% { opacity: 1; } 100% { top: 36px; opacity: 0; } }
 
-/* ---------- Nav ---------- */
-#site-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-  border-bottom: 1px solid transparent;
-}
-#site-nav.is-scrolled {
-  background: rgba(10, 13, 23, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom-color: var(--line);
-}
+/* ---------- reveal on scroll ---------- */
+[data-reveal] { transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+[data-reveal].is-visible { opacity: 1 !important; transform: translateY(0); }
 
-.nav-inner {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 0 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--nav-h);
-}
-@media (min-width: 768px) {
-  .nav-inner {
-    padding-left: 2rem;
-    padding-right: 2rem;
-  }
-}
+/* ---------- cast cards ---------- */
+.cast-grid { margin-top: 4rem; display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+@media (min-width: 640px) { .cast-grid { grid-template-columns: repeat(3, 1fr); } }
+.cast-card { background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; padding: 1.75rem; opacity: 0; transition: opacity .7s ease, transform .7s ease, border-color .2s ease; transform: translateY(18px); border-top: 3px solid transparent; }
+.cast-card.is-visible { opacity: 1; transform: translateY(0); }
+.cast-card--pro { border-top-color: var(--pro); }
+.cast-card--con { border-top-color: var(--con); }
+.cast-card--judge { border-top-color: var(--judge); }
+.cast-card__role { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cast-card__title { font-family: 'Fraunces', Georgia, serif; font-size: 1.4rem; margin-top: 0.5rem; }
+.cast-card__blurb { color: var(--muted); font-size: 0.875rem; margin-top: 0.75rem; line-height: 1.6; }
 
-.nav-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.nav-brand__title {
-  font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  font-size: 1.125rem;
-}
+/* ---------- compare toggle (why section) ---------- */
+.toggle-row { display: flex; justify-content: center; margin-bottom: 1.5rem; }
+.toggle-pill { display: inline-flex; background: var(--void); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 4px; }
+.toggle-pill__btn { font-size: 0.85rem; padding: 0.5rem 1.1rem; border-radius: 999px; color: var(--muted); transition: background .2s ease, color .2s ease; }
+.toggle-pill__btn.is-active { background: var(--panel2); color: var(--ink); }
+.compare-panel__inner { background: var(--void); border: 1px solid var(--line); border-radius: 1rem; padding: 1.75rem; }
+.mono-label { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-bottom: 0.75rem; }
+.quote-line { color: var(--ink); line-height: 1.7; }
+.transcript-line { font-size: 0.9rem; margin-top: 0.75rem; color: var(--ink); }
+.transcript-line:first-of-type { margin-top: 0; }
+.compare-list { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.875rem; color: var(--muted); }
+.tag { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.tag--pro { background: rgba(242,149,74,0.15); color: var(--pro); }
+.tag--con { background: rgba(47,211,196,0.15); color: var(--con); }
+.tag--judge { background: rgba(232,196,104,0.15); color: var(--judge); }
 
-.nav-links {
-  display: none;
-  align-items: center;
-  gap: 2rem;
-  font-size: 0.875rem;
-  color: var(--muted);
-}
-@media (min-width: 768px) {
-  .nav-links {
-    display: flex;
-  }
-}
-.nav-link {
-  transition: color 0.2s ease;
-}
-.nav-link:hover,
-.nav-link:focus-visible {
-  color: var(--ink);
-}
+/* ---------- feature cards ---------- */
+.feature-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 640px) { .feature-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .feature-grid { grid-template-columns: repeat(3, 1fr); } }
+.feature-card { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; padding: 1.5rem; transition: border-color .2s ease, transform .2s ease; }
+.feature-card:hover { border-color: rgba(232,196,104,0.4); transform: translateY(-2px); }
+.feature-card.is-active { border-color: var(--judge); }
+.feature-card__icon { font-size: 1.1rem; color: var(--judge); }
+.feature-card__title { font-family: 'Fraunces', Georgia, serif; font-size: 1.15rem; margin-top: 0.6rem; }
+.feature-card__blurb { color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; line-height: 1.5; }
+.feature-detail { margin-top: 1.5rem; background: var(--void); border: 1px solid rgba(232,196,104,0.3); border-radius: 1rem; padding: 1.75rem; position: relative; }
+.feature-detail__close { position: absolute; top: 1rem; right: 1.1rem; font-size: 1.4rem; color: var(--muted); line-height: 1; }
+.feature-detail__close:hover { color: var(--ink); }
+.feature-detail__title { font-family: 'Fraunces', Georgia, serif; font-size: 1.3rem; margin-bottom: 0.5rem; }
+.feature-detail__body { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
 
-#nav-toggle {
-  width: 2.25rem;
-  height: 2.25rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-@media (min-width: 768px) {
-  #nav-toggle {
-    display: none;
-  }
-}
-.burger-line {
-  display: block;
-  width: 1.25rem;
-  height: 2px;
-  background: var(--ink);
-  border-radius: 1px;
-  transition: transform 0.25s var(--ease), opacity 0.2s ease;
-}
-#nav-toggle[aria-expanded="true"] .burger-line:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
-}
-#nav-toggle[aria-expanded="true"] .burger-line:nth-child(2) {
-  opacity: 0;
-}
-#nav-toggle[aria-expanded="true"] .burger-line:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
-}
-
-#mobile-menu {
-  display: none;
-  background: rgba(18, 23, 41, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
-}
-#mobile-menu.is-open {
-  display: block;
-}
-.mobile-nav {
-  display: flex;
-  flex-direction: column;
-  padding: 1rem 1.25rem;
-  gap: 1rem;
-  font-size: 1rem;
-}
-.mobile-nav-link {
-  color: var(--ink);
-  padding: 0.25rem 0;
-}
-
-/* Gavel mark */
-.gavel-mark {
-  position: relative;
-  display: inline-flex;
-  width: 1.1rem;
-  height: 1.1rem;
-  border-radius: 0.25rem;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.gavel-mark__pro,
-.gavel-mark__con {
-  flex: 1;
-  height: 100%;
-}
-.gavel-mark__pro { background: var(--pro); }
-.gavel-mark__con { background: var(--con); }
-
-/* ---------- Buttons ---------- */
-.btn-primary,
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 1.5rem;
-  border-radius: 999px;
-  font-weight: 500;
-  font-size: 0.95rem;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
-}
-.btn-primary {
-  background: var(--ink);
-  color: var(--void);
-}
-.btn-primary:hover {
-  background: #fff;
-  transform: translateY(-1px);
-}
-.btn-ghost {
-  border: 1px solid var(--line);
-  color: var(--muted);
-}
-.btn-ghost:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  color: var(--ink);
-}
-
-/* ---------- Hero ---------- */
-.hero {
-  position: relative;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-#three-canvas-wrap {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-#arena-canvas {
-  width: 100%;
-  height: 100%;
-}
-
-.hero-vignette {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 40%, transparent 0%, var(--void) 75%),
-    linear-gradient(to bottom, transparent 60%, var(--void) 100%);
-  pointer-events: none;
-}
-
-.hero-content {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 5rem 1.25rem 2.5rem;
-}
-
-.hero-title {
-  font-family: var(--font-display);
-  font-size: 2.6rem;
-  line-height: 1.05;
-  font-weight: 500;
-  max-width: 56rem;
-  margin: 0;
-}
-@media (min-width: 640px) {
-  .hero-title {
-    font-size: 3.75rem;
-  }
-}
-@media (min-width: 768px) {
-  .hero-title {
-    font-size: 4.5rem;
-  }
-}
-.hero-title .text-pro {
-  color: var(--pro);
-  font-style: italic;
-}
-
-.hero-lead {
-  margin-top: 1.5rem;
-  max-width: 36rem;
-  color: var(--muted);
-  font-size: 1rem;
-  line-height: 1.7;
-}
-@media (min-width: 640px) {
-  .hero-lead {
-    font-size: 1.125rem;
-  }
-}
-
-.hero-cta {
-  margin-top: 2.25rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-@media (min-width: 640px) {
-  .hero-cta {
-    flex-direction: row;
-  }
-}
-
-.hero-scroll {
-  position: relative;
-  padding-bottom: 1.5rem;
-  display: flex;
-  justify-content: center;
-}
-
-.scroll-cue {
-  width: 1.5rem;
-  height: 2.25rem;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  position: relative;
-}
-.scroll-cue::after {
-  content: "";
-  position: absolute;
-  top: 0.4rem;
-  left: 50%;
-  width: 0.3rem;
-  height: 0.3rem;
-  margin-left: -0.15rem;
-  background: var(--muted);
-  border-radius: 50%;
-  animation: scroll-pulse 1.6s ease-in-out infinite;
-}
-@keyframes scroll-pulse {
-  0%   { opacity: 1; transform: translateY(0); }
-  70%  { opacity: 0; transform: translateY(0.7rem); }
-  100% { opacity: 0; transform: translateY(0.7rem); }
-}
-
-/* Reveal animation */
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(1.25rem);
-  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
-}
-[data-reveal].is-visible {
-  opacity: 1;
-  transform: none;
-}
-
-/* ---------- Explainer / cast cards ---------- */
-.cast-grid {
-  max-width: 56rem;
-  margin: 4rem auto 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.25rem;
-}
-@media (min-width: 640px) {
-  .cast-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.cast-card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  text-align: left;
-  transition: border-color 0.25s ease, transform 0.25s ease;
-}
-.cast-card:hover {
-  transform: translateY(-2px);
-}
-.cast-card--pro { border-top: 2px solid var(--pro); }
-.cast-card--con { border-top: 2px solid var(--con); }
-.cast-card--judge { border-top: 2px solid var(--judge); }
-
-.cast-card__role {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.cast-card h3 {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 500;
-  margin: 0.5rem 0 0;
-}
-.cast-card p {
-  margin: 0.75rem 0 0;
-  font-size: 0.875rem;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-/* ---------- Why / compare toggle ---------- */
-.toggle-pill {
-  display: inline-flex;
-  padding: 0.25rem;
-  background: var(--panel2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  gap: 0.25rem;
-}
-.toggle-pill__btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: 999px;
-  font-size: 0.875rem;
-  color: var(--muted);
-  transition: background 0.2s ease, color 0.2s ease;
-}
-.toggle-pill__btn.is-active {
-  background: var(--ink);
-  color: var(--void);
-  font-weight: 500;
-}
-
-.compare-panel {
-  background: var(--void);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  overflow: hidden;
-}
-.compare-panel.hidden {
-  display: none;
-}
-.compare-panel__inner {
-  padding: 1.5rem;
-}
-.compare-panel ul {
-  list-style: none;
-  margin-top: 1.25rem;
-}
-.compare-panel li {
-  font-size: 0.875rem;
-  color: var(--muted);
-  padding: 0.25rem 0;
-}
-
-.tag {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  padding: 0.15rem 0.45rem;
-  border-radius: 0.25rem;
-  margin-right: 0.35rem;
-}
-.tag--pro {
-  background: rgba(242, 149, 74, 0.15);
-  color: var(--pro);
-}
-.tag--con {
-  background: rgba(47, 211, 196, 0.15);
-  color: var(--con);
-}
-.tag--judge {
-  background: rgba(232, 196, 104, 0.15);
-  color: var(--judge);
-}
-
-/* ---------- Feature grid ---------- */
-#feature-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-@media (min-width: 640px) {
-  #feature-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (min-width: 1024px) {
-  #feature-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.feature-card {
-  text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1.35rem 1.25rem;
-  transition: border-color 0.2s ease, background 0.2s ease;
-  cursor: pointer;
-}
-.feature-card:hover,
-.feature-card.is-active {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: var(--panel2);
-}
-.feature-card__icon {
-  display: block;
-  font-size: 1.25rem;
-  color: var(--muted);
-  margin-bottom: 0.75rem;
-}
-.feature-card__title {
-  font-family: var(--font-display);
-  font-size: 1.125rem;
-  font-weight: 500;
-  margin: 0 0 0.5rem;
-}
-.feature-card__blurb {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.feature-detail {
-  position: relative;
-  margin-top: 1.5rem;
-  background: var(--panel2);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1.5rem 1.5rem 1.5rem 1.75rem;
-}
-.feature-detail.hidden {
-  display: none;
-}
-.feature-detail__close {
-  position: absolute;
-  top: 0.75rem;
-  right: 1rem;
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--muted);
-}
-.feature-detail__close:hover {
-  color: var(--ink);
-}
-
-/* ---------- How / timeline ---------- */
-.flow-timeline {
-  list-style: none;
-  max-width: 42rem;
-  margin: 0 auto;
-  position: relative;
-  padding-left: 0;
-}
-.flow-timeline::before {
-  content: "";
-  position: absolute;
-  left: 0.55rem;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  width: 1px;
-  background: var(--line);
-}
-@media (min-width: 640px) {
-  .flow-timeline::before {
-    left: 0.7rem;
-  }
-}
-
-.flow-step {
-  position: relative;
-  padding-left: 2.5rem;
-  margin-bottom: 2.5rem;
-}
-.flow-step:last-child {
-  margin-bottom: 0;
-}
-.flow-step::before {
-  content: "";
-  position: absolute;
-  left: 0.3rem;
-  top: 0.4rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--muted);
-  border: 2px solid var(--void);
-  box-shadow: 0 0 0 1px var(--line);
-}
-.flow-step--branch::before {
-  background: var(--panel2);
-  border-color: var(--muted);
-}
-.flow-step--end::before {
-  background: var(--judge);
-}
-
-.flow-step__label {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 0.35rem;
-}
+/* ---------- how / flow timeline ---------- */
+.flow-timeline { max-width: 42rem; margin-inline: auto; position: relative; padding-left: 2rem; }
+.flow-timeline::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 1px; background: rgba(255,255,255,0.12); }
+.flow-step { position: relative; padding-bottom: 2.75rem; opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+.flow-step.is-visible { opacity: 1; transform: translateY(0); }
+.flow-step::before { content: ""; position: absolute; left: -2rem; top: 4px; width: 13px; height: 13px; border-radius: 999px; background: var(--void); border: 2px solid rgba(255,255,255,0.3); }
+.flow-step:last-child { padding-bottom: 0; }
+.flow-step__label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .flow-step__label--pro { color: var(--pro); }
 .flow-step__label--con { color: var(--con); }
 .flow-step__label--judge { color: var(--judge); }
+.flow-step__title { font-family: 'Fraunces', Georgia, serif; font-size: 1.3rem; margin-top: 0.35rem; }
+.flow-step__body { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-top: 0.5rem; max-width: 34rem; }
 
-.flow-step__title {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 500;
-  margin: 0 0 0.5rem;
-}
-.flow-step__body {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.65;
-  font-size: 0.95rem;
-}
+/* ---------- simulator ---------- */
+.sim-topic-row { display: flex; flex-direction: column; gap: 0.75rem; }
+@media (min-width: 640px) { .sim-topic-row { flex-direction: row; } }
+.sim-select { flex: 1; background: var(--void); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem 1rem; color: var(--ink); font-size: 0.9rem; }
+.sim-meta { display: flex; align-items: center; gap: 1.5rem; margin-top: 1.5rem; flex-wrap: wrap; }
+.sim-meta__item { display: flex; flex-direction: column; gap: 0.2rem; }
+.sim-meta__item--grow { flex: 1; min-width: 160px; }
+.sim-meta__label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sim-meta__value { font-size: 1rem; }
+.sim-confidence-track { height: 6px; background: var(--panel2); border-radius: 999px; overflow: hidden; margin-top: 4px; }
+.sim-confidence-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--con), var(--judge)); transition: width .6s ease; }
+.sim-transcript { margin-top: 1.5rem; background: var(--void); border: 1px solid var(--line); border-radius: 1rem; padding: 1.5rem; min-height: 220px; max-height: 420px; overflow-y: auto; }
+.sim-transcript__placeholder { color: #5c6580; font-size: 0.9rem; }
+.sim-line { margin-bottom: 1.1rem; opacity: 0; animation: lineIn .4s ease forwards; }
+@keyframes lineIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.sim-line__speaker { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+.sim-line--pro .sim-line__speaker { color: var(--pro); }
+.sim-line--con .sim-line__speaker { color: var(--con); }
+.sim-line--judge .sim-line__speaker { color: var(--judge); }
+.sim-line__text { font-size: 0.9rem; line-height: 1.6; margin-top: 0.3rem; color: #d7dae4; }
+.sim-cursor { display: inline-block; width: 6px; height: 1em; background: currentColor; vertical-align: text-bottom; animation: blink 0.9s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.sim-verdict { margin-top: 1.5rem; background: linear-gradient(135deg, rgba(232,196,104,0.12), rgba(47,211,196,0.06)); border: 1px solid rgba(232,196,104,0.35); border-radius: 1rem; padding: 1.5rem; }
+.sim-verdict__title { font-family: 'Fraunces', Georgia, serif; font-size: 1.4rem; color: var(--judge); }
+.sim-verdict__body { font-size: 0.9rem; color: var(--muted); margin-top: 0.5rem; line-height: 1.6; }
 
-/* ---------- Simulator ---------- */
-.sim-topic-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-}
-@media (min-width: 640px) {
-  .sim-topic-row {
-    flex-direction: row;
-    align-items: stretch;
-  }
-}
+/* ---------- when cards ---------- */
+.when-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 768px) { .when-grid { grid-template-columns: repeat(2, 1fr); } }
+.when-card { background: var(--void); border-radius: 1rem; padding: 1.75rem; opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s ease; }
+.when-card.is-visible { opacity: 1; transform: translateY(0); }
+.when-card--good { border: 1px solid rgba(47,211,196,0.3); }
+.when-card--bad { border: 1px solid var(--line); }
+.when-card__title { font-family: 'Fraunces', Georgia, serif; font-size: 1.2rem; margin-bottom: 1rem; }
+.when-card--good .when-card__title { color: var(--con); }
+.when-card__list { display: flex; flex-direction: column; gap: 0.65rem; font-size: 0.9rem; color: #c7ccd9; line-height: 1.5; }
+.when-card__list li { padding-left: 1.1rem; position: relative; }
+.when-card__list li::before { content: "—"; position: absolute; left: 0; color: #5c6580; }
 
-.sim-select {
-  flex: 1;
-  appearance: none;
-  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2395A0B8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 1rem center;
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  color: var(--ink);
-  padding: 0.85rem 2.5rem 0.85rem 1rem;
-  font-size: 0.95rem;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-.sim-select:focus {
-  border-color: rgba(255, 255, 255, 0.25);
-}
-.sim-select option {
-  background: var(--panel);
-  color: var(--ink);
-}
+/* ---------- accordion ---------- */
+.accordion-item { border-bottom: 1px solid var(--line); }
+.accordion-item__head { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 1.25rem 0; font-family: 'Fraunces', Georgia, serif; font-size: 1.05rem; color: var(--ink); }
+.accordion-item__chevron { color: var(--judge); font-size: 1.1rem; transition: transform .2s ease; }
+.accordion-item__head[aria-expanded="true"] .accordion-item__chevron { transform: rotate(45deg); }
+.accordion-item__body { max-height: 0; overflow: hidden; transition: max-height .3s ease, padding .3s ease; color: var(--muted); font-size: 0.9rem; line-height: 1.65; }
+.accordion-item__body p { padding-bottom: 1.25rem; }
+.accordion-item__body code { background: var(--panel2); padding: 1px 6px; border-radius: 4px; font-size: 0.82em; color: var(--judge); }
 
-.sim-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  font-size: 0.8rem;
-}
-.sim-meta__item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.sim-meta__item--grow {
-  flex: 1;
-  min-width: 8rem;
-}
-.sim-meta__label {
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.7rem;
-}
-.sim-meta__value {
-  font-family: var(--font-mono);
-  color: var(--ink);
-}
+/* ---------- code section ---------- */
+.code-grid { display: grid; grid-template-columns: 1fr; gap: 2.5rem; }
+@media (min-width: 1024px) { .code-grid { grid-template-columns: 2fr 3fr; } }
+.code-heading { font-family: 'Fraunces', Georgia, serif; font-size: 1.05rem; color: var(--ink); margin-bottom: 0.85rem; }
+.code-heading--spaced { margin-top: 2.5rem; }
+.code-tree, .code-block pre { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.7; color: #c7ccd9; background: var(--void); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.25rem; overflow-x: auto; white-space: pre; margin: 0; }
+.code-tree__note { color: #5c6580; }
+.code-block { position: relative; }
+.code-block__copy { position: absolute; top: 0.6rem; right: 0.6rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; background: var(--panel2); color: #c7ccd9; padding: 0.3rem 0.65rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.1); transition: background .2s ease, color .2s ease; }
+.code-block__copy:hover { background: var(--judge); color: var(--void); }
+.code-block__copy.is-copied { background: var(--con); color: var(--void); }
+.dl-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 640px) { .dl-grid { grid-template-columns: repeat(2, 1fr); } }
+.dl-card { display: flex; flex-direction: column; gap: 0.4rem; background: var(--void); border: 1px solid var(--line); border-radius: 1rem; padding: 1.25rem; transition: border-color .2s ease, transform .2s ease; }
+.dl-card:hover { border-color: var(--judge); transform: translateY(-2px); }
+.dl-card__ext { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--judge); }
+.dl-card__name { font-weight: 600; font-size: 0.92rem; }
+.dl-card__desc { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+.dl-note { font-size: 0.8rem; color: #5c6580; margin-top: 0.75rem; line-height: 1.5; }
 
-.sim-confidence-track {
-  flex: 1;
-  height: 0.4rem;
-  background: var(--panel2);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.sim-confidence-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--con), var(--judge));
-  border-radius: 999px;
-  transition: width 0.5s var(--ease);
-}
-
-.sim-transcript {
-  min-height: 16rem;
-  max-height: 28rem;
-  overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1.25rem;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-.sim-transcript__placeholder {
-  color: var(--muted);
-  margin: 0;
-  text-align: center;
-  padding: 3rem 1rem;
-}
-.sim-entry {
-  margin-bottom: 1.15rem;
-  padding-bottom: 1.15rem;
-  border-bottom: 1px solid var(--line);
-}
-.sim-entry:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-.sim-entry__head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-  font-size: 0.8rem;
-}
-.sim-entry__role {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  padding: 0.15rem 0.45rem;
-  border-radius: 0.25rem;
-}
-.sim-entry__role--pro {
-  background: rgba(242, 149, 74, 0.15);
-  color: var(--pro);
-}
-.sim-entry__role--con {
-  background: rgba(47, 211, 196, 0.15);
-  color: var(--con);
-}
-.sim-entry__role--judge {
-  background: rgba(232, 196, 104, 0.15);
-  color: var(--judge);
-}
-.sim-entry__round {
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-}
-.sim-entry__body {
-  margin: 0;
-  color: var(--ink);
-}
-
-.sim-verdict {
-  margin-top: 1.25rem;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(232, 196, 104, 0.08), rgba(47, 211, 196, 0.06));
-  border: 1px solid rgba(232, 196, 104, 0.3);
-  border-radius: 1rem;
-}
-.sim-verdict.hidden {
-  display: none;
-}
-.sim-verdict h3 {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  margin: 0 0 0.5rem;
-  color: var(--judge);
-}
-.sim-verdict p {
-  margin: 0;
-  color: var(--ink);
-  line-height: 1.6;
-}
-
-/* ---------- When cards ---------- */
-.when-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.5rem;
-}
-@media (min-width: 768px) {
-  .when-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.when-card {
-  background: var(--void);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1.5rem;
-}
-.when-card--good {
-  border-top: 2px solid var(--con);
-}
-.when-card--bad {
-  border-top: 2px solid var(--pro);
-}
-.when-card__title {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 500;
-  margin: 0 0 1rem;
-}
-.when-card__list {
-  list-style: none;
-}
-.when-card__list li {
-  position: relative;
-  padding-left: 1.25rem;
-  margin-bottom: 0.75rem;
-  color: var(--muted);
-  font-size: 0.95rem;
-  line-height: 1.55;
-}
-.when-card__list li:last-child {
-  margin-bottom: 0;
-}
-.when-card--good .when-card__list li::before {
-  content: "✓";
-  position: absolute;
-  left: 0;
-  color: var(--con);
-  font-weight: 600;
-}
-.when-card--bad .when-card__list li::before {
-  content: "✕";
-  position: absolute;
-  left: 0;
-  color: var(--pro);
-  font-weight: 600;
-}
-
-/* ---------- Accordion ---------- */
-.accordion {
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  overflow: hidden;
-}
-.accordion-item {
-  border-bottom: 1px solid var(--line);
-}
-.accordion-item:last-child {
-  border-bottom: none;
-}
-.accordion-item__head {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem 1.25rem;
-  text-align: left;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--ink);
-  transition: background 0.2s ease;
-}
-.accordion-item__head:hover {
-  background: var(--panel);
-}
-.accordion-item__chevron {
-  flex-shrink: 0;
-  font-size: 1.1rem;
-  color: var(--muted);
-  transition: transform 0.25s ease;
-}
-.accordion-item__head[aria-expanded="true"] .accordion-item__chevron {
-  transform: rotate(45deg);
-}
-.accordion-item__body {
-  display: none;
-  padding: 0 1.25rem 1.25rem;
-  color: var(--muted);
-  font-size: 0.95rem;
-  line-height: 1.65;
-}
-.accordion-item__body.is-open {
-  display: block;
-}
-.accordion-item__body code {
-  font-size: 0.85em;
-  background: var(--panel2);
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.25rem;
-  color: var(--con);
-}
-
-/* ---------- Code section ---------- */
-.code-heading {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin: 0 0 0.75rem;
-  color: var(--ink);
-}
-
-.code-tree {
-  background: var(--void);
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  padding: 1.15rem;
-  overflow-x: auto;
-  font-size: 0.8rem;
-  line-height: 1.7;
-  color: var(--ink);
-  margin: 0;
-}
-.code-tree__note {
-  color: var(--muted);
-}
-
-.code-block {
-  position: relative;
-  background: var(--void);
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  overflow: hidden;
-}
-.code-block pre {
-  margin: 0;
-  padding: 1.15rem;
-  overflow-x: auto;
-  font-size: 0.8rem;
-  line-height: 1.65;
-  color: var(--ink);
-}
-.code-block__copy {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  background: var(--panel2);
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  color: var(--muted);
-  z-index: 1;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-.code-block__copy:hover {
-  color: var(--ink);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.dl-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-@media (min-width: 640px) {
-  .dl-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.dl-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 1.25rem;
-  background: var(--void);
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-.dl-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-}
-.dl-card__ext {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--pro);
-  letter-spacing: 0.04em;
-}
-.dl-card__name {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-.dl-card__desc {
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.code-layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2.5rem;
-}
-@media (min-width: 1024px) {
-  .code-layout {
-    grid-template-columns: 2fr 3fr;
-  }
-}
-
-/* ---------- Footer ---------- */
-.site-footer {
-  position: relative;
-  padding: 3rem 1.25rem;
-  border-top: 1px solid var(--line);
-}
-.footer-inner {
-  max-width: 72rem;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  font-size: 0.875rem;
-  color: var(--muted);
-  text-align: center;
-}
-@media (min-width: 640px) {
-  .footer-inner {
-    flex-direction: row;
-    text-align: left;
-  }
-}
-.footer-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* ---------- Color text helpers ---------- */
-.text-ink { color: var(--ink); }
-.text-muted { color: var(--muted); }
-.text-pro { color: var(--pro); }
-.text-con { color: var(--con); }
-.text-judge { color: var(--judge); }
-
-.text-sm { font-size: 0.875rem; }
-.text-xs { font-size: 0.75rem; }
-.text-lg { font-size: 1.125rem; }
-.text-base { font-size: 1rem; }
-.text-2xl { font-size: 1.5rem; }
-.text-3xl { font-size: 1.875rem; }
-
-.leading-relaxed { line-height: 1.7; }
-.leading-tight { line-height: 1.2; }
-
-.mb-3 { margin-bottom: 0.75rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mb-5 { margin-bottom: 1.25rem; }
-.mb-6 { margin-bottom: 1.5rem; }
-.mb-12 { margin-bottom: 3rem; }
-.mb-14 { margin-bottom: 3.5rem; }
-.mb-16 { margin-bottom: 4rem; }
-.mt-2 { margin-top: 0.5rem; }
-.mt-3 { margin-top: 0.75rem; }
-.mt-5 { margin-top: 1.25rem; }
-.mt-6 { margin-top: 1.5rem; }
-.mt-9 { margin-top: 2.25rem; }
-.mt-10 { margin-top: 2.5rem; }
-.mt-16 { margin-top: 4rem; }
-
-.hidden {
-  display: none !important;
-}
-
-.shrink-0 {
-  flex-shrink: 0;
-}
-
-/* Section title sizing */
-.section-title {
-  font-family: var(--font-display);
-  font-size: 1.875rem;
-  line-height: 1.2;
-  font-weight: 500;
-  margin: 0.75rem 0 0;
-}
-@media (min-width: 640px) {
-  .section-title {
-    font-size: 2.25rem;
-  }
-}
-
-/* Space-y helper for lists */
-.space-y-2 > * + * {
-  margin-top: 0.5rem;
-}
-
-/* Utility for stacking */
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-.gap-2 { gap: 0.5rem; }
-.gap-4 { gap: 1rem; }
-.gap-5 { gap: 1.25rem; }
-.gap-6 { gap: 1.5rem; }
-.gap-8 { gap: 2rem; }
-.gap-10 { gap: 2.5rem; }
-.relative { position: relative; }
-.absolute { position: absolute; }
-.inset-0 { inset: 0; }
-.overflow-hidden { overflow: hidden; }
-.pointer-events-none { pointer-events: none; }
-
-@media (min-width: 640px) {
-  .sm\:block { display: block !important; }
-  .sm\:flex-row { flex-direction: row; }
-  .sm\:text-lg { font-size: 1.125rem; }
-  .sm\:text-4xl { font-size: 2.25rem; }
-  .sm\:text-6xl { font-size: 3.75rem; }
-  .sm\:py-32 { padding-top: 8rem; padding-bottom: 8rem; }
-  .sm\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-  .sm\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
-}
-
-@media (min-width: 768px) {
-  .md\:flex { display: flex; }
-  .md\:hidden { display: none !important; }
-  .md\:px-8 { padding-left: 2rem; padding-right: 2rem; }
-  .md\:text-7xl { font-size: 4.5rem; }
-  .md\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (min-width: 1024px) {
-  .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
-  .lg\:grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
-  .lg\:col-span-2 { grid-column: span 2; }
-  .lg\:col-span-3 { grid-column: span 3; }
-}
-
+/* ---------- footer ---------- */
+.footer { position: relative; padding: 3rem 1.25rem; border-top: 1px solid var(--line); }
+.footer__inner { max-width: 72rem; margin-inline: auto; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 1rem; font-size: 0.875rem; color: var(--muted); text-align: center; }
+@media (min-width: 640px) { .footer__inner { flex-direction: row; text-align: left; } }
+.footer__brand { display: flex; align-items: center; gap: 0.5rem; }
 </style>
+
 </head>
 
 <body>
@@ -1298,14 +318,14 @@ em.italic {
 <!-- ============ NAV ============ -->
 <header id="site-nav">
   <div class="nav-inner">
-    <a href="#top" class="nav-brand">
+    <a href="#top" class="brand">
       <span class="gavel-mark" aria-hidden="true">
         <span class="gavel-mark__pro"></span><span class="gavel-mark__con"></span>
       </span>
-      <span class="nav-brand__title">The Debate Engine</span>
+      <span class="brand__text">The Debate Engine</span>
     </a>
 
-    <nav class="nav-links" aria-label="Primary">
+    <nav class="nav-desktop">
       <a href="#why" class="nav-link">Why</a>
       <a href="#what" class="nav-link">What</a>
       <a href="#how" class="nav-link">How</a>
@@ -1314,15 +334,13 @@ em.italic {
       <a href="#code" class="nav-link">Code</a>
     </nav>
 
-    <button id="nav-toggle" aria-label="Open menu" aria-expanded="false">
-      <span class="burger-line"></span>
-      <span class="burger-line"></span>
-      <span class="burger-line"></span>
+    <button id="nav-toggle" class="nav-toggle" aria-label="Open menu" aria-expanded="false">
+      <span class="burger-line"></span><span class="burger-line"></span><span class="burger-line"></span>
     </button>
   </div>
 
-  <div id="mobile-menu">
-    <nav class="mobile-nav" aria-label="Mobile">
+  <div id="mobile-menu" class="mobile-menu">
+    <nav class="mobile-menu__nav">
       <a href="#why" class="mobile-nav-link">Why</a>
       <a href="#what" class="mobile-nav-link">What</a>
       <a href="#how" class="mobile-nav-link">How</a>
@@ -1337,90 +355,90 @@ em.italic {
 
 <!-- ============ HERO ============ -->
 <section id="top" class="hero">
-  <div id="three-canvas-wrap" aria-hidden="true">
+  <div id="three-canvas-wrap" class="hero__canvas-wrap" aria-hidden="true">
     <canvas id="arena-canvas"></canvas>
   </div>
   <div class="hero-vignette"></div>
 
-  <div class="hero-content">
-    <p class="eyebrow mb-5" data-reveal>
+  <div class="hero__content">
+    <p class="eyebrow" data-reveal>
       <span class="dot dot--pro"></span>Pro&nbsp;&nbsp;
       <span class="dot dot--con"></span>Con&nbsp;&nbsp;
       <span class="dot dot--judge"></span>Judge
     </p>
-    <h1 class="hero-title" data-reveal data-reveal-delay="80">
-      Two AIs walk into<br class="sm:block hidden"> an <em class="italic text-pro">argument.</em>
+    <h1 class="hero__title" data-reveal data-reveal-delay="80">
+      Two AIs walk into<br class="hero__break"> an <em class="italic text-pro">argument.</em>
     </h1>
-    <p class="hero-lead" data-reveal data-reveal-delay="180">
+    <p class="hero__subtitle" data-reveal data-reveal-delay="180">
       One argues for. One argues against. A neutral judge watches every round and only calls it once the case is actually clear. That's the whole idea — and it fixes a real problem with asking a single AI for its opinion.
     </p>
-    <div class="hero-cta" data-reveal data-reveal-delay="280">
+    <div class="hero__cta" data-reveal data-reveal-delay="280">
       <a href="#try" class="btn-primary">Watch a debate happen</a>
       <a href="#why" class="btn-ghost">Why this exists ↓</a>
     </div>
   </div>
 
-  <div class="hero-scroll" data-reveal data-reveal-delay="380">
+  <div class="hero__scroll-wrap" data-reveal data-reveal-delay="380">
     <div class="scroll-cue" aria-hidden="true"></div>
   </div>
 </section>
 
 <!-- ============ NON-TECHNICAL EXPLAINER ============ -->
-<section id="explainer" class="section">
-  <div class="max-w-3xl mx-auto text-center">
+<section id="explainer" class="section section--divider">
+  <div class="wrap wrap--sm center">
     <p class="kicker">For absolutely anyone</p>
-    <h2 class="section-title mb-6">
+    <h2 class="section-title section-title--mb-lg">
       Imagine you only ever heard <em class="italic text-con">one side</em> of every story.
     </h2>
-    <p class="text-muted text-lg leading-relaxed">
+    <p class="lede lede--center">
       Now imagine, instead, you invited two smart people who <em class="not-italic text-ink">disagree</em>
       into the room. One is fully convinced the idea is right. The other is fully convinced it's wrong.
       They go back and forth, round after round, each one forced to answer the other's best point —
       not just repeat their own. When they're done, a referee who hasn't taken a side the whole time
       tells you plainly who made the stronger case, how sure they are, and why.
     </p>
-    <p class="mt-6 text-muted text-lg leading-relaxed">
+    <p class="lede lede--center lede--spaced">
       That's this system. The "smart people" and the "referee" are AI agents instead of humans —
       but the reason it works is the same reason it works with humans: disagreement, done honestly,
       surfaces things a single confident voice tends to skip over.
     </p>
   </div>
 
-  <div class="cast-grid">
+  <div class="wrap wrap--md cast-grid">
     <div class="cast-card cast-card--pro" data-reveal>
       <span class="cast-card__role">Argues for it</span>
-      <h3>Agent Pro</h3>
-      <p>Builds the strongest possible case in favor — then has to defend it when Con pushes back.</p>
+      <h3 class="cast-card__title">Agent Pro</h3>
+      <p class="cast-card__blurb">Builds the strongest possible case in favor — then has to defend it when Con pushes back.</p>
     </div>
     <div class="cast-card cast-card--con" data-reveal data-reveal-delay="80">
       <span class="cast-card__role">Argues against it</span>
-      <h3>Agent Con</h3>
-      <p>Finds the weak assumptions and attacks them directly, round after round.</p>
+      <h3 class="cast-card__title">Agent Con</h3>
+      <p class="cast-card__blurb">Finds the weak assumptions and attacks them directly, round after round.</p>
     </div>
     <div class="cast-card cast-card--judge" data-reveal data-reveal-delay="160">
       <span class="cast-card__role">Decides who's right</span>
-      <h3>The Judge</h3>
-      <p>Watches, stays neutral, and only calls the debate once it's genuinely confident.</p>
+      <h3 class="cast-card__title">The Judge</h3>
+      <p class="cast-card__blurb">Watches, stays neutral, and only calls the debate once it's genuinely confident.</p>
     </div>
   </div>
 </section>
 
 <!-- ============ WHY ============ -->
-<section id="why" class="section section--panel">
-  <div class="max-w-5xl mx-auto">
+<section id="why" class="section section--panel section--divider">
+  <div class="wrap wrap--lg">
     <p class="kicker">Why this exists</p>
-    <h2 class="section-title mb-4 max-w-2xl">
+    <h2 class="section-title section-title--narrow">
       A single AI answer has a habit of sounding sure of itself — <em class="italic text-pro">whether or not it should.</em>
     </h2>
-    <p class="text-muted max-w-2xl leading-relaxed mb-14">
+    <p class="lede lede--gap-lg">
       Ask one model a loaded question and you get one confident-sounding paragraph. It might be right.
       It might be quietly one-sided. You have no easy way to tell which. Forcing a real disagreement —
-      with a judge held to a strict bar before it can end the debate — trades that false confidence for
-      something you can actually check.
+      then handing the verdict to a judge who only looks once, at the very end, and has to actually
+      commit to a side — trades that false confidence for something you can actually check.
     </p>
 
-    <div class="max-w-3xl mx-auto">
-      <div class="flex justify-center mb-6">
+    <div class="wrap wrap--sm">
+      <div class="toggle-row">
         <div id="compare-toggle" class="toggle-pill" role="tablist" aria-label="Compare approaches">
           <button class="toggle-pill__btn is-active" data-target="ask" role="tab" aria-selected="true">Ask once</button>
           <button class="toggle-pill__btn" data-target="debate" role="tab" aria-selected="false">Debate it out</button>
@@ -1429,9 +447,9 @@ em.italic {
 
       <div id="compare-ask" class="compare-panel">
         <div class="compare-panel__inner">
-          <p class="font-mono text-xs text-muted mb-3">single-model-answer.txt</p>
-          <p class="text-ink leading-relaxed">"Yes, remote-first companies clearly outperform. Studies show higher retention and output."</p>
-          <ul class="mt-5 space-y-2 text-sm text-muted">
+          <p class="mono-label">single-model-answer.txt</p>
+          <p class="quote-line">"Yes, remote-first companies clearly outperform. Studies show higher retention and output."</p>
+          <ul class="compare-list">
             <li>✕ No visibility into what it left out</li>
             <li>✕ Confidence isn't backed by anything you can inspect</li>
             <li>✕ One framing, presented as the whole picture</li>
@@ -1439,15 +457,15 @@ em.italic {
         </div>
       </div>
 
-      <div id="compare-debate" class="compare-panel hidden">
+      <div id="compare-debate" class="compare-panel is-hidden">
         <div class="compare-panel__inner">
-          <p class="font-mono text-xs text-muted mb-3">debate_transcripts/round_04.md</p>
-          <p class="text-sm"><span class="tag tag--pro">Pro</span> <span class="text-ink">Remote-first firms report measurably lower attrition and comparable output per study X…</span></p>
-          <p class="text-sm mt-3"><span class="tag tag--con">Con</span> <span class="text-ink">That study self-selected for senior ICs — junior onboarding and mentorship metrics tell the opposite story…</span></p>
-          <p class="text-sm mt-3"><span class="tag tag--judge">Judge</span> <span class="text-ink">Confidence 74% — below the 82% bar. Continuing to round 5.</span></p>
-          <ul class="mt-5 space-y-2 text-sm text-muted">
+          <p class="mono-label">debate_transcripts/round_04.md</p>
+          <p class="transcript-line"><span class="tag tag--pro">Pro</span> <span class="text-ink">Remote-first firms report measurably lower attrition and comparable output per study X…</span></p>
+          <p class="transcript-line"><span class="tag tag--con">Con</span> <span class="text-ink">That study self-selected for senior ICs — junior onboarding and mentorship metrics tell the opposite story…</span></p>
+          <p class="transcript-line"><span class="tag tag--judge">Judge (after round 4, once)</span> <span class="text-ink">Backs Con, 74% confidence — the selection-bias point was never actually answered.</span></p>
+          <ul class="compare-list">
             <li>✓ Both framings on the record, in their strongest form</li>
-            <li>✓ A confidence number tied to an actual stopping rule</li>
+            <li>✓ One verdict, formed only after everything was said</li>
             <li>✓ A transcript you can hand to someone else and check</li>
           </ul>
         </div>
@@ -1457,63 +475,57 @@ em.italic {
 </section>
 
 <!-- ============ WHAT ============ -->
-<section id="what" class="section">
-  <div class="max-w-5xl mx-auto">
+<section id="what" class="section section--divider">
+  <div class="wrap wrap--lg">
     <p class="kicker">What it actually does</p>
-    <h2 class="section-title mb-14 max-w-2xl">
-      Six moving parts, working together.
-    </h2>
+    <h2 class="section-title section-title--narrow section-title--gap">Six moving parts, working together.</h2>
 
-    <div id="feature-grid">
-      <button class="feature-card" data-feature="clarity" type="button">
+    <div id="feature-grid" class="feature-grid">
+      <button class="feature-card" data-feature="clarity">
         <span class="feature-card__icon">◐</span>
         <h3 class="feature-card__title">Clarity check, first</h3>
         <p class="feature-card__blurb">Scores your topic 0–1 before anything starts. Vague topics get clarifying questions instead of a wasted debate.</p>
       </button>
-      <button class="feature-card" data-feature="temp" type="button">
+      <button class="feature-card" data-feature="temp">
         <span class="feature-card__icon">◑</span>
         <h3 class="feature-card__title">Temperature that shifts</h3>
         <p class="feature-card__blurb">Agents start exploratory and get more precise each round — creative early, disciplined by the end.</p>
       </button>
-      <button class="feature-card" data-feature="stop" type="button">
+      <button class="feature-card" data-feature="stop">
         <span class="feature-card__icon">◒</span>
-        <h3 class="feature-card__title">Early stop, gated twice</h3>
-        <p class="feature-card__blurb">The judge can only end things once the minimum rounds are done <em>and</em> confidence clears the bar. Both, not either.</p>
+        <h3 class="feature-card__title">One verdict, no peeking</h3>
+        <p class="feature-card__blurb">The judge doesn't see a word of the transcript until every round is done. No interim checkpoints, no early stop, no going back for more.</p>
       </button>
-      <button class="feature-card" data-feature="minrounds" type="button">
+      <button class="feature-card" data-feature="minrounds">
         <span class="feature-card__icon">◓</span>
-        <h3 class="feature-card__title">Minimum rounds</h3>
-        <p class="feature-card__blurb">Stops the judge from calling it after one lucky exchange. You set the floor.</p>
+        <h3 class="feature-card__title">You set the round count</h3>
+        <p class="feature-card__blurb">A fixed number of Pro/Con exchanges happen first. That number is entirely yours to set — the judge just waits.</p>
       </button>
-      <button class="feature-card" data-feature="roles" type="button">
+      <button class="feature-card" data-feature="roles">
         <span class="feature-card__icon">◔</span>
         <h3 class="feature-card__title">Real opponent awareness</h3>
         <p class="feature-card__blurb">Each side sees the other's points as an opponent's argument, not its own prior output — so rebuttals actually rebut.</p>
       </button>
-      <button class="feature-card" data-feature="transcript" type="button">
+      <button class="feature-card" data-feature="transcript">
         <span class="feature-card__icon">◕</span>
         <h3 class="feature-card__title">Full transcript, saved</h3>
         <p class="feature-card__blurb">Every round, the verdict, and a summary table — written to a clean Markdown file you can hand off.</p>
       </button>
     </div>
 
-    <div id="feature-detail" class="feature-detail hidden">
-      <button id="feature-detail-close" class="feature-detail__close" aria-label="Close" type="button">×</button>
+    <div id="feature-detail" class="feature-detail is-hidden">
+      <button id="feature-detail-close" class="feature-detail__close" aria-label="Close">×</button>
       <div id="feature-detail-body"></div>
     </div>
   </div>
 </section>
 
 <!-- ============ HOW ============ -->
-<section id="how" class="section section--panel">
-  <div class="max-w-3xl mx-auto">
+<section id="how" class="section section--panel section--divider">
+  <div class="wrap wrap--sm center">
     <p class="kicker">How it actually runs</p>
-    <h2 class="section-title mb-4">
-      The whole thing is a loop with two exits.
-    </h2>
-    <p class="text-muted leading-relaxed mb-16">
-      Not a diagram of boxes and arrows — this is the real order of events, the same one the code follows.
-    </p>
+    <h2 class="section-title">The whole thing is a loop with two exits.</h2>
+    <p class="lede lede--center lede--gap-xl">Not a diagram of boxes and arrows — this is the real order of events, the same one the code follows.</p>
   </div>
 
   <ol class="flow-timeline">
@@ -1523,46 +535,36 @@ em.italic {
       <p class="flow-step__body">Your topic gets scored. Below 0.72, you get 1–3 clarifying questions and a rewritten, debatable topic. At or above, it starts immediately.</p>
     </li>
     <li class="flow-step" data-reveal>
-      <span class="flow-step__label flow-step__label--pro">Round N</span>
-      <h3 class="flow-step__title">Pro argues</h3>
-      <p class="flow-step__body">180–260 words, a clear thesis, and a direct answer to whatever Con said last round.</p>
+      <span class="flow-step__label flow-step__label--pro">Round 1 → N</span>
+      <h3 class="flow-step__title">Pro and Con alternate, uninterrupted</h3>
+      <p class="flow-step__body">180–260 words each, direct rebuttals, temperature dropping a little every round. This repeats for exactly the number of rounds you set — nobody is watching the scoreboard yet.</p>
     </li>
     <li class="flow-step" data-reveal>
-      <span class="flow-step__label flow-step__label--con">Round N</span>
-      <h3 class="flow-step__title">Con argues</h3>
-      <p class="flow-step__body">Same length, same rules, pointed the other way — attacking Pro's weakest assumption.</p>
-    </li>
-    <li class="flow-step" data-reveal>
-      <span class="flow-step__label flow-step__label--judge">Every 2 rounds</span>
-      <h3 class="flow-step__title">Judge checkpoint</h3>
-      <p class="flow-step__body">Reads the full transcript so far. Picks a leader, states a confidence score, and can only end the debate if min-rounds is met <em>and</em> confidence ≥ 82%.</p>
-    </li>
-    <li class="flow-step flow-step--branch" data-reveal>
-      <span class="flow-step__label">Branch</span>
-      <h3 class="flow-step__title">Not confident yet? Back to Pro.</h3>
-      <p class="flow-step__body">The loop repeats, up to a hard ceiling of rounds, so a genuinely close call doesn't run forever.</p>
+      <span class="flow-step__label flow-step__label--judge">After round N, once</span>
+      <h3 class="flow-step__title">Judge reads the whole thing</h3>
+      <p class="flow-step__body">The judge's first look at the transcript is also its only look — the complete, finished debate, all at once. No mid-debate checkpoints, no peeking.</p>
     </li>
     <li class="flow-step flow-step--end" data-reveal>
       <span class="flow-step__label flow-step__label--judge">Final</span>
       <h3 class="flow-step__title">Verdict + transcript.md</h3>
-      <p class="flow-step__body">Winner, confidence, reasoning, and a summary table — written to disk, not just printed and lost.</p>
+      <p class="flow-step__body">The judge backs Pro or Con — never a draw, that option doesn't exist in its schema — with a confidence score, reasoning, and a summary table, all written to disk.</p>
     </li>
   </ol>
 </section>
 
 <!-- ============ TRY IT (simulator) ============ -->
-<section id="try" class="section">
-  <div class="max-w-3xl mx-auto text-center mb-12">
+<section id="try" class="section section--divider">
+  <div class="wrap wrap--sm center">
     <p class="kicker">Try it</p>
-    <h2 class="section-title mb-4">Run a sample debate right here.</h2>
-    <p class="text-muted leading-relaxed">
+    <h2 class="section-title">Run a sample debate right here.</h2>
+    <p class="lede lede--center">
       This runs entirely in your browser using a scripted example — no API key, no backend. It's here so you can
       feel the pacing (temperature dropping, the judge holding back, confidence finally clearing the bar) before
       you run the real thing on your own topic.
     </p>
   </div>
 
-  <div class="max-w-2xl mx-auto">
+  <div class="wrap wrap--sm" style="margin-top:3rem;">
     <div class="sim-topic-row">
       <label for="sim-topic" class="sr-only">Debate topic</label>
       <select id="sim-topic" class="sim-select">
@@ -1570,12 +572,12 @@ em.italic {
         <option value="junior">Should AI agents replace junior developers by 2028?</option>
         <option value="fourday">Should the standard work week be four days?</option>
       </select>
-      <button id="sim-start" class="btn-primary shrink-0" type="button">Start debate</button>
+      <button id="sim-start" class="btn-primary">Start debate</button>
     </div>
 
     <div class="sim-meta">
-      <div class="sim-meta__item"><span class="sim-meta__label">Round</span><span id="sim-round" class="sim-meta__value">—</span></div>
-      <div class="sim-meta__item"><span class="sim-meta__label">Temp</span><span id="sim-temp" class="sim-meta__value">—</span></div>
+      <div class="sim-meta__item"><span class="sim-meta__label">Round</span><span id="sim-round" class="sim-meta__value font-mono">—</span></div>
+      <div class="sim-meta__item"><span class="sim-meta__label">Temp</span><span id="sim-temp" class="sim-meta__value font-mono">—</span></div>
       <div class="sim-meta__item sim-meta__item--grow">
         <span class="sim-meta__label">Confidence</span>
         <div class="sim-confidence-track"><div id="sim-confidence-fill" class="sim-confidence-fill"></div></div>
@@ -1586,17 +588,15 @@ em.italic {
       <p class="sim-transcript__placeholder">Pick a topic and press start — the transcript builds live below.</p>
     </div>
 
-    <div id="sim-verdict" class="sim-verdict hidden"></div>
+    <div id="sim-verdict" class="sim-verdict is-hidden"></div>
   </div>
 </section>
 
 <!-- ============ WHEN ============ -->
-<section id="when" class="section section--panel">
-  <div class="max-w-4xl mx-auto">
+<section id="when" class="section section--panel section--divider">
+  <div class="wrap wrap--lg">
     <p class="kicker">When to reach for it</p>
-    <h2 class="section-title mb-14 max-w-2xl">
-      It's a tool for close calls, not every question.
-    </h2>
+    <h2 class="section-title section-title--narrow section-title--gap">It's a tool for close calls, not every question.</h2>
 
     <div class="when-grid">
       <div class="when-card when-card--good" data-reveal>
@@ -1621,23 +621,23 @@ em.italic {
 </section>
 
 <!-- ============ TECHNICAL ARCHITECTURE (accordion) ============ -->
-<section id="architecture" class="section">
-  <div class="max-w-3xl mx-auto">
+<section id="architecture" class="section section--divider">
+  <div class="wrap wrap--sm">
     <p class="kicker">Under the hood</p>
-    <h2 class="section-title mb-4">For the technically curious.</h2>
-    <p class="text-muted leading-relaxed mb-12">A short, honest architecture breakdown — expand what's relevant to you.</p>
+    <h2 class="section-title">For the technically curious.</h2>
+    <p class="lede lede--gap-lg">A short, honest architecture breakdown — expand what's relevant to you.</p>
 
     <div id="accordion" class="accordion">
       <div class="accordion-item">
-        <button class="accordion-item__head" aria-expanded="false" type="button">
+        <button class="accordion-item__head" aria-expanded="false">
           <span>Orchestration: LangGraph state machine</span><span class="accordion-item__chevron">＋</span>
         </button>
         <div class="accordion-item__body">
-          <p>Pro, Con, and Judge are nodes in a <code>StateGraph</code>. Con's node increments the round counter; a routing function sends the graph to the Judge every two rounds, otherwise back to Pro. The Judge's edge decides <code>continue</code> vs <code>end</code>.</p>
+          <p>Pro, Con, and Judge are nodes in a <code>StateGraph</code>. Con's node increments the round counter; a routing function keeps sending the graph back to Pro until every round is used up, then — and only then — sends it to the Judge. The edge from the Judge goes straight to <code>END</code>: there's no path back to Pro.</p>
         </div>
       </div>
       <div class="accordion-item">
-        <button class="accordion-item__head" aria-expanded="false" type="button">
+        <button class="accordion-item__head" aria-expanded="false">
           <span>Structured output with Pydantic</span><span class="accordion-item__chevron">＋</span>
         </button>
         <div class="accordion-item__body">
@@ -1645,23 +645,23 @@ em.italic {
         </div>
       </div>
       <div class="accordion-item">
-        <button class="accordion-item__head" aria-expanded="false" type="button">
+        <button class="accordion-item__head" aria-expanded="false">
           <span>Opponent-relative message roles</span><span class="accordion-item__chevron">＋</span>
         </button>
         <div class="accordion-item__body">
-          <p>Each agent's own prior turns are sent back to it as assistant messages; the opponent's and the judge's turns are sent as user messages. That's what makes rebuttals engage with what the other side actually said, instead of each side continuing its own monologue.</p>
+          <p>Each agent's own prior turns are sent back to it as assistant messages; the opponent's turns are sent as user messages. That's what makes rebuttals engage with what the other side actually said, instead of each side continuing its own monologue. The judge never appears mid-transcript — it only speaks once, at the very end.</p>
         </div>
       </div>
       <div class="accordion-item">
-        <button class="accordion-item__head" aria-expanded="false" type="button">
-          <span>Confidence-gated early stop</span><span class="accordion-item__chevron">＋</span>
+        <button class="accordion-item__head" aria-expanded="false">
+          <span>Single-shot verdict, forced to pick a side</span><span class="accordion-item__chevron">＋</span>
         </button>
         <div class="accordion-item__body">
-          <p>The judge can only stop the debate once <code>round ≥ min_rounds</code> <strong>and</strong> <code>confidence ≥ 0.82</code>. Both conditions are enforced in code after the model responds, not just requested in the prompt.</p>
+          <p>The judge node runs exactly once, after the round loop exits — no confidence gate, no early stop, no re-entry. <code>JudgeDecision.winner</code> is typed <code>Literal["Pro", "Con"]</code>, so there's no "Draw" value the model can even return; a modest confidence score is fine for a close case, but a side must always be picked.</p>
         </div>
       </div>
       <div class="accordion-item">
-        <button class="accordion-item__head" aria-expanded="false" type="button">
+        <button class="accordion-item__head" aria-expanded="false">
           <span>Retries and partial-transcript saves</span><span class="accordion-item__chevron">＋</span>
         </button>
         <div class="accordion-item__body">
@@ -1669,7 +669,7 @@ em.italic {
         </div>
       </div>
       <div class="accordion-item">
-        <button class="accordion-item__head" aria-expanded="false" type="button">
+        <button class="accordion-item__head" aria-expanded="false">
           <span>Model-agnostic endpoint config</span><span class="accordion-item__chevron">＋</span>
         </button>
         <div class="accordion-item__body">
@@ -1681,36 +681,40 @@ em.italic {
 </section>
 
 <!-- ============ CODE / GET IT ============ -->
-<section id="code" class="section section--panel">
-  <div class="max-w-4xl mx-auto">
+<section id="code" class="section section--panel section--divider">
+  <div class="wrap wrap--xl">
     <p class="kicker">Get the code</p>
-    <h2 class="section-title mb-14 max-w-2xl">Everything on this page, runnable.</h2>
+    <h2 class="section-title section-title--narrow section-title--gap">Everything on this page, runnable.</h2>
 
-    <div class="code-layout">
+    <div class="code-grid">
+      <!-- folder structure -->
       <div>
         <h3 class="code-heading">Folder structure</h3>
-        <pre class="code-tree"><code>debate-engine.html          <span class="code-tree__note"># single self-contained page</span>
-# open in any browser — no build step, no other files</code></pre>
+        <pre class="code-tree"><code>debate-system-website/
+├── index.html            <span class="code-tree__note"># this page — fully self-contained</span>
+├── docs/
+│   ├── multi-agent-debate-system.md
+│   ├── debate_engine.py  <span class="code-tree__note"># the actual engine</span>
+│   └── requirements.txt
+└── README.md</code></pre>
 
-        <h3 class="code-heading mt-10">Run the site</h3>
+        <h3 class="code-heading code-heading--spaced">Run the site</h3>
         <div class="code-block">
-          <button class="code-block__copy" data-copy-target="cmd-site" type="button">Copy</button>
-          <pre id="cmd-site"><code># open the single file directly
-open debate-engine.html       # macOS
-xdg-open debate-engine.html   # Linux
-start debate-engine.html      # Windows
-
-# no server required — pure HTML</code></pre>
+          <button class="code-block__copy" data-copy-target="cmd-site">Copy</button>
+          <pre id="cmd-site"><code># just open it — no server, no build step
+open index.html          # macOS
+xdg-open index.html      # Linux
+# or double-click it on Windows</code></pre>
         </div>
 
-        <h3 class="code-heading mt-10">Run the real engine</h3>
+        <h3 class="code-heading code-heading--spaced">Run the real engine</h3>
         <div class="code-block">
-          <button class="code-block__copy" data-copy-target="cmd-engine" type="button">Copy</button>
+          <button class="code-block__copy" data-copy-target="cmd-engine">Copy</button>
           <pre id="cmd-engine"><code>pip install -r requirements.txt
 
 python debate_engine.py \
   --topic "Should we go fully remote?" \
-  --min-rounds 4 --max-rounds 8
+  --rounds 4
 
 # point at a LiteLLM proxy instead of OpenAI directly
 python debate_engine.py --topic "..." \
@@ -1718,35 +722,36 @@ python debate_engine.py --topic "..." \
         </div>
       </div>
 
+      <!-- downloads -->
       <div>
         <h3 class="code-heading">Download</h3>
         <div class="dl-grid">
-          <a href="#code" class="dl-card">
+          <a href="docs/debate_engine.py" download class="dl-card">
             <span class="dl-card__ext">.py</span>
-            <span class="dl-card__name">Engine design</span>
-            <span class="dl-card__desc">See the architecture section and code snippet on this page for the engine design.</span>
+            <span class="dl-card__name">debate_engine.py</span>
+            <span class="dl-card__desc">The full LangGraph engine — Pro/Con/Judge agents, clarity scoring, retries, transcript saving.</span>
           </a>
-          <a href="#architecture" class="dl-card">
+          <a href="docs/multi-agent-debate-system.md" download class="dl-card">
             <span class="dl-card__ext">.md</span>
-            <span class="dl-card__name">Architecture notes</span>
-            <span class="dl-card__desc">Everything on this page is the write-up — scroll to Under the hood and How it runs.</span>
+            <span class="dl-card__name">multi-agent-debate-system.md</span>
+            <span class="dl-card__desc">The complete write-up this page is based on, including implementation detail.</span>
           </a>
         </div>
+        <p class="dl-note">These links point at the sibling <code>docs/</code> folder that ships alongside this file — no server required, they open as plain local files.</p>
 
-        <h3 class="code-heading mt-10">A peek at the engine</h3>
+        <h3 class="code-heading code-heading--spaced">A peek at the engine</h3>
         <div class="code-block">
-          <button class="code-block__copy" data-copy-target="cmd-snippet" type="button">Copy</button>
-          <pre id="cmd-snippet"><code>def get_temperature(current_round: int, max_rounds: int) -> float:
-    """Higher temperature early, lower later."""
-    progress = (current_round - 1) / max(max_rounds - 1, 1)
-    temp = 0.85 - (progress * 0.55)
-    return round(max(0.30, min(0.85, temp)), 2)
+          <button class="code-block__copy" data-copy-target="cmd-snippet">Copy</button>
+          <pre id="cmd-snippet"><code>class JudgeDecision(BaseModel):
+    # No "Draw" — the judge is required to back a side.
+    winner: Literal["Pro", "Con"]
+    confidence: float = Field(ge=0.0, le=1.0)
+    reasoning: str
 
-can_stop = (
-    result.should_stop
-    and state["round"] >= state["min_rounds"]
-    and result.confidence >= EARLY_STOP_CONFIDENCE
-)</code></pre>
+def route_after_con(state):
+    if state["round"] <= state["total_rounds"]:
+        return "pro"      # more rounds to go
+    return "judge"          # judge only ever runs here, once</code></pre>
         </div>
       </div>
     </div>
@@ -1756,9 +761,9 @@ can_stop = (
 </main>
 
 <!-- ============ FOOTER ============ -->
-<footer class="site-footer">
-  <div class="footer-inner">
-    <div class="footer-brand">
+<footer class="footer">
+  <div class="footer__inner">
+    <div class="footer__brand">
       <span class="gavel-mark" aria-hidden="true"><span class="gavel-mark__pro"></span><span class="gavel-mark__con"></span></span>
       <span>The Debate Engine</span>
     </div>
@@ -1767,614 +772,428 @@ can_stop = (
 </footer>
 
 <script>
-/* ============================================================
-   Hero debate-arena — lightweight Three.js particles
-   Falls back silently if Three.js is unavailable.
-   ============================================================ */
+/* =========================================================
+   THE DEBATE ENGINE — single-file scripts
+   Section 1: Three.js hero animation
+   Section 2: jQuery interactions + simulator
+   No build step, no modules — everything runs as soon as
+   the CDN scripts above have loaded.
+   ========================================================= */
 
+/* ---------------------------------------------------------
+   SECTION 1 — Debate arena hero animation (Three.js)
+   Two opposing particle streams (Pro = amber, Con = teal)
+   converge on a rotating core that pulses gold on a timer,
+   standing in for the judge checkpoints in the real system.
+   --------------------------------------------------------- */
 (function () {
-  "use strict";
+  var canvas = document.getElementById('arena-canvas');
+  if (!canvas || typeof THREE === 'undefined') return;
 
-  if (typeof THREE === "undefined") return;
+  var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var isMobile = window.innerWidth < 768;
 
-  const wrap = document.getElementById("three-canvas-wrap");
-  const canvas = document.getElementById("arena-canvas");
-  if (!wrap || !canvas) return;
+  var wrap = document.getElementById('three-canvas-wrap');
+  var width = wrap.clientWidth;
+  var height = wrap.clientHeight;
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
-  camera.position.z = 6;
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 100);
+  camera.position.set(0, 0.4, 9);
 
-  const renderer = new THREE.WebGLRenderer({
-    canvas: canvas,
-    antialias: true,
-    alpha: true,
-  });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setClearColor(0x000000, 0);
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
+  renderer.setSize(width, height);
 
-  // Two opposing particle clouds (Pro / Con) + a central judge glow
-  const COLORS = {
-    pro: new THREE.Color(0xf2954a),
-    con: new THREE.Color(0x2fd3c4),
-    judge: new THREE.Color(0xe8c468),
-    dim: new THREE.Color(0x2a3348),
-  };
+  var PRO_COLOR = new THREE.Color(0xF2954A);
+  var CON_COLOR = new THREE.Color(0x2FD3C4);
+  var JUDGE_COLOR = new THREE.Color(0xE8C468);
+  var JUDGE_BASE_COLOR = new THREE.Color(0x8a7550);
 
-  function makeCloud(count, color, side) {
-    const geo = new THREE.BufferGeometry();
-    const positions = new Float32Array(count * 3);
-    const speeds = new Float32Array(count);
+  var COUNT_PER_SIDE = isMobile ? 90 : 220;
+  var SPAN_X = 9;
+  var SPAN_YZ = 2.6;
 
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      // Cluster on left (pro) or right (con)
-      const xBase = side * (1.6 + Math.random() * 1.4);
-      positions[i3] = xBase + (Math.random() - 0.5) * 1.2;
-      positions[i3 + 1] = (Math.random() - 0.5) * 3.2;
-      positions[i3 + 2] = (Math.random() - 0.5) * 2.0;
-      speeds[i] = 0.15 + Math.random() * 0.35;
+  function resetParticle(positions, i, direction, initialSpread) {
+    var startX = direction === 1 ? -SPAN_X : SPAN_X;
+    var traveled = initialSpread ? Math.random() : 0;
+    positions[i * 3] = initialSpread ? startX * (1 - traveled) + (Math.random() - 0.5) * 0.4 : startX;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * SPAN_YZ;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * SPAN_YZ * 0.6 - 1;
+  }
+
+  function makeStream(color, direction) {
+    var geometry = new THREE.BufferGeometry();
+    var positions = new Float32Array(COUNT_PER_SIDE * 3);
+    var speeds = new Float32Array(COUNT_PER_SIDE);
+    var offsets = new Float32Array(COUNT_PER_SIDE);
+
+    for (var i = 0; i < COUNT_PER_SIDE; i++) {
+      resetParticle(positions, i, direction, true);
+      speeds[i] = 0.012 + Math.random() * 0.018;
+      offsets[i] = Math.random() * Math.PI * 2;
     }
 
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.userData.speeds = speeds;
-    geo.userData.side = side;
-
-    const mat = new THREE.PointsMaterial({
-      color: color,
-      size: 0.035,
-      transparent: true,
-      opacity: 0.75,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      sizeAttenuation: true,
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    var material = new THREE.PointsMaterial({
+      color: color, size: isMobile ? 0.05 : 0.06, transparent: true, opacity: 0.85,
+      depthWrite: false, blending: THREE.AdditiveBlending
     });
-
-    return new THREE.Points(geo, mat);
+    var points = new THREE.Points(geometry, material);
+    scene.add(points);
+    return { points: points, positions: positions, speeds: speeds, offsets: offsets, direction: direction };
   }
 
-  const proCloud = makeCloud(180, COLORS.pro, -1);
-  const conCloud = makeCloud(180, COLORS.con, 1);
-  scene.add(proCloud);
-  scene.add(conCloud);
+  var proStream = makeStream(PRO_COLOR, 1);
+  var conStream = makeStream(CON_COLOR, -1);
 
-  // Central soft points for "judge" presence
-  const judgeGeo = new THREE.BufferGeometry();
-  const jCount = 40;
-  const jPos = new Float32Array(jCount * 3);
-  for (let i = 0; i < jCount; i++) {
-    jPos[i * 3] = (Math.random() - 0.5) * 0.6;
-    jPos[i * 3 + 1] = (Math.random() - 0.5) * 1.2;
-    jPos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
-  }
-  judgeGeo.setAttribute("position", new THREE.BufferAttribute(jPos, 3));
-  const judgeMat = new THREE.PointsMaterial({
-    color: COLORS.judge,
-    size: 0.05,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const judgeCloud = new THREE.Points(judgeGeo, judgeMat);
-  scene.add(judgeCloud);
-
-  // Thin connecting arcs (simple line segments between sides)
-  const lineMat = new THREE.LineBasicMaterial({
-    color: 0x3a4560,
-    transparent: true,
-    opacity: 0.25,
-  });
-  const lines = [];
-  for (let i = 0; i < 8; i++) {
-    const g = new THREE.BufferGeometry();
-    const y = (i / 7 - 0.5) * 2.4;
-    const pts = new Float32Array([
-      -2.2, y + (Math.random() - 0.5) * 0.3, 0,
-      2.2, y + (Math.random() - 0.5) * 0.3, 0,
-    ]);
-    g.setAttribute("position", new THREE.BufferAttribute(pts, 3));
-    const line = new THREE.Line(g, lineMat);
-    scene.add(line);
-    lines.push(line);
-  }
-
-  function resize() {
-    const w = wrap.clientWidth;
-    const h = wrap.clientHeight;
-    if (w === 0 || h === 0) return;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h, false);
-  }
-  resize();
-  window.addEventListener("resize", resize);
-
-  let raf = 0;
-  let t0 = performance.now();
-
-  function animate(now) {
-    raf = requestAnimationFrame(animate);
-    const t = (now - t0) * 0.001;
-
-    function drift(cloud) {
-      const pos = cloud.geometry.attributes.position;
-      const speeds = cloud.geometry.userData.speeds;
-      const side = cloud.geometry.userData.side;
-      for (let i = 0; i < pos.count; i++) {
-        const i3 = i * 3;
-        pos.array[i3 + 1] += Math.sin(t * speeds[i] + i) * 0.0015;
-        pos.array[i3] += Math.cos(t * speeds[i] * 0.7 + i * 0.3) * 0.0008 * side;
+  function updateStream(stream, t) {
+    var pos = stream.positions;
+    for (var i = 0; i < COUNT_PER_SIDE; i++) {
+      var idx = i * 3;
+      pos[idx] += stream.direction * stream.speeds[i];
+      pos[idx + 1] += Math.sin(t * 0.001 + stream.offsets[i]) * 0.0015;
+      var reachedCenter = stream.direction === 1 ? pos[idx] > -0.15 : pos[idx] < 0.15;
+      if (reachedCenter) {
+        pos[idx] = stream.direction === 1 ? -SPAN_X : SPAN_X;
+        pos[idx + 1] = (Math.random() - 0.5) * SPAN_YZ;
+        pos[idx + 2] = (Math.random() - 0.5) * SPAN_YZ * 0.6 - 1;
       }
-      pos.needsUpdate = true;
-      cloud.rotation.y = Math.sin(t * 0.12) * 0.04 * side;
+    }
+    stream.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  var coreGeo = new THREE.IcosahedronGeometry(0.85, 1);
+  var coreMat = new THREE.MeshBasicMaterial({ color: JUDGE_BASE_COLOR, wireframe: true, transparent: true, opacity: 0.55 });
+  var core = new THREE.Mesh(coreGeo, coreMat);
+  scene.add(core);
+
+  var coreGlowGeo = new THREE.IcosahedronGeometry(0.85, 1);
+  var coreGlowMat = new THREE.MeshBasicMaterial({ color: JUDGE_COLOR, wireframe: true, transparent: true, opacity: 0 });
+  var coreGlow = new THREE.Mesh(coreGlowGeo, coreGlowMat);
+  coreGlow.scale.setScalar(1.15);
+  scene.add(coreGlow);
+
+  var BURST_COUNT = isMobile ? 40 : 80;
+  var burstGeo = new THREE.BufferGeometry();
+  var burstPositions = new Float32Array(BURST_COUNT * 3);
+  var burstVelocities = [];
+  for (var b = 0; b < BURST_COUNT; b++) {
+    burstPositions[b * 3] = 0; burstPositions[b * 3 + 1] = 0; burstPositions[b * 3 + 2] = 0;
+    var theta = Math.random() * Math.PI * 2;
+    var phi = Math.acos(2 * Math.random() - 1);
+    var r = 0.04 + Math.random() * 0.05;
+    burstVelocities.push(new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)));
+  }
+  burstGeo.setAttribute('position', new THREE.BufferAttribute(burstPositions, 3));
+  var burstMat = new THREE.PointsMaterial({ color: JUDGE_COLOR, size: 0.05, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  var burstPoints = new THREE.Points(burstGeo, burstMat);
+  scene.add(burstPoints);
+
+  var pulseState = { active: false, t: 0, duration: 900, nextAt: 2600 };
+
+  function triggerPulse() {
+    pulseState.active = true;
+    pulseState.t = 0;
+    var pos = burstGeo.attributes.position.array;
+    for (var i = 0; i < BURST_COUNT; i++) { pos[i * 3] = 0; pos[i * 3 + 1] = 0; pos[i * 3 + 2] = 0; }
+    burstGeo.attributes.position.needsUpdate = true;
+  }
+
+  var clock = new THREE.Clock();
+
+  function renderStatic() {
+    core.rotation.set(0.3, 0.5, 0);
+    renderer.render(scene, camera);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var elapsedMs = clock.getElapsedTime() * 1000;
+
+    updateStream(proStream, elapsedMs);
+    updateStream(conStream, elapsedMs);
+
+    core.rotation.y += 0.0022;
+    core.rotation.x += 0.0009;
+    coreGlow.rotation.copy(core.rotation);
+
+    if (!pulseState.active && elapsedMs > pulseState.nextAt) {
+      triggerPulse();
+      pulseState.nextAt = elapsedMs + pulseState.duration + 3200 + Math.random() * 1400;
     }
 
-    drift(proCloud);
-    drift(conCloud);
+    if (pulseState.active) {
+      pulseState.t += 16.6;
+      var p = Math.min(pulseState.t / pulseState.duration, 1);
+      var scale = 1 + Math.sin(p * Math.PI) * 0.35;
+      coreGlow.scale.setScalar(1.15 * scale);
+      coreGlowMat.opacity = Math.sin(p * Math.PI) * 0.8;
 
-    judgeCloud.rotation.y = t * 0.08;
-    judgeCloud.material.opacity = 0.4 + Math.sin(t * 1.2) * 0.15;
+      var bpos = burstGeo.attributes.position.array;
+      for (var i = 0; i < BURST_COUNT; i++) {
+        bpos[i * 3] += burstVelocities[i].x;
+        bpos[i * 3 + 1] += burstVelocities[i].y;
+        bpos[i * 3 + 2] += burstVelocities[i].z;
+      }
+      burstGeo.attributes.position.needsUpdate = true;
+      burstMat.opacity = (1 - p) * 0.9;
 
-    lines.forEach(function (line, idx) {
-      line.material.opacity = 0.12 + Math.sin(t * 0.6 + idx) * 0.08;
-    });
-
-    camera.position.x = Math.sin(t * 0.1) * 0.15;
-    camera.position.y = Math.cos(t * 0.08) * 0.1;
-    camera.lookAt(0, 0, 0);
+      if (p >= 1) { pulseState.active = false; coreGlowMat.opacity = 0; burstMat.opacity = 0; }
+    }
 
     renderer.render(scene, camera);
   }
 
-  // Pause when tab hidden
-  document.addEventListener("visibilitychange", function () {
-    if (document.hidden) {
-      cancelAnimationFrame(raf);
-    } else {
-      t0 = performance.now() - (performance.now() - t0);
-      raf = requestAnimationFrame(animate);
-    }
-  });
+  function handleResize() {
+    width = wrap.clientWidth;
+    height = wrap.clientHeight;
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+  }
+  window.addEventListener('resize', handleResize);
 
-  raf = requestAnimationFrame(animate);
+  if (prefersReducedMotion) { renderStatic(); } else { animate(); }
 })();
 
-</script>
-<script>
-/* ============================================================
-   The Debate Engine — main interactions (vanilla JS)
-   ============================================================ */
+/* ---------------------------------------------------------
+   SECTION 2 — jQuery interactions + simulator
+   --------------------------------------------------------- */
+$(function () {
 
-(function () {
-  "use strict";
+  var $nav = $('#site-nav');
+  function updateNavState() { $nav.toggleClass('is-scrolled', $(window).scrollTop() > 12); }
+  updateNavState();
+  $(window).on('scroll', updateNavState);
 
-  /* ---------- Nav scroll + mobile menu ---------- */
-  const nav = document.getElementById("site-nav");
-  const navToggle = document.getElementById("nav-toggle");
-  const mobileMenu = document.getElementById("mobile-menu");
+  var $navToggle = $('#nav-toggle');
+  var $mobileMenu = $('#mobile-menu');
+  $navToggle.on('click', function () {
+    var opening = !$mobileMenu.hasClass('is-open');
+    $mobileMenu.toggleClass('is-open', opening);
+    $(this).attr('aria-expanded', opening);
+  });
+  $('.mobile-nav-link').on('click', function () {
+    $mobileMenu.removeClass('is-open');
+    $navToggle.attr('aria-expanded', false);
+  });
 
-  function updateNav() {
-    if (!nav) return;
-    if (window.scrollY > 24) {
-      nav.classList.add("is-scrolled");
-    } else {
-      nav.classList.remove("is-scrolled");
-    }
-  }
-  window.addEventListener("scroll", updateNav, { passive: true });
-  updateNav();
-
-  if (navToggle && mobileMenu) {
-    navToggle.addEventListener("click", function () {
-      const open = navToggle.getAttribute("aria-expanded") === "true";
-      navToggle.setAttribute("aria-expanded", String(!open));
-      mobileMenu.classList.toggle("is-open", !open);
-    });
-
-    mobileMenu.querySelectorAll("a").forEach(function (link) {
-      link.addEventListener("click", function () {
-        navToggle.setAttribute("aria-expanded", "false");
-        mobileMenu.classList.remove("is-open");
+  var revealTargets = document.querySelectorAll('[data-reveal]');
+  if ('IntersectionObserver' in window && revealTargets.length) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          var el = entry.target;
+          var delay = parseInt(el.getAttribute('data-reveal-delay') || '0', 10);
+          setTimeout(function () { el.classList.add('is-visible'); }, delay);
+          io.unobserve(el);
+        }
       });
-    });
-  }
-
-  /* ---------- Scroll reveal ---------- */
-  const revealEls = document.querySelectorAll("[data-reveal]");
-  if ("IntersectionObserver" in window) {
-    const io = new IntersectionObserver(
-      function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            const delay = parseInt(entry.target.getAttribute("data-reveal-delay") || "0", 10);
-            setTimeout(function () {
-              entry.target.classList.add("is-visible");
-            }, delay);
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
-    );
-    revealEls.forEach(function (el) {
-      io.observe(el);
-    });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    revealTargets.forEach(function (el) { io.observe(el); });
   } else {
-    revealEls.forEach(function (el) {
-      el.classList.add("is-visible");
-    });
+    revealTargets.forEach(function (el) { el.classList.add('is-visible'); });
   }
 
-  /* ---------- Compare toggle (Why section) ---------- */
-  const compareToggle = document.getElementById("compare-toggle");
-  if (compareToggle) {
-    const buttons = compareToggle.querySelectorAll(".toggle-pill__btn");
-    const panels = {
-      ask: document.getElementById("compare-ask"),
-      debate: document.getElementById("compare-debate"),
-    };
+  $('#compare-toggle .toggle-pill__btn').on('click', function () {
+    var target = $(this).data('target');
+    $('#compare-toggle .toggle-pill__btn').removeClass('is-active').attr('aria-selected', 'false');
+    $(this).addClass('is-active').attr('aria-selected', 'true');
+    $('#compare-ask, #compare-debate').addClass('is-hidden');
+    $('#compare-' + target).removeClass('is-hidden');
+  });
 
-    buttons.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const target = btn.getAttribute("data-target");
-        buttons.forEach(function (b) {
-          const active = b === btn;
-          b.classList.toggle("is-active", active);
-          b.setAttribute("aria-selected", String(active));
-        });
-        Object.keys(panels).forEach(function (key) {
-          if (!panels[key]) return;
-          panels[key].classList.toggle("hidden", key !== target);
-        });
-      });
-    });
-  }
-
-  /* ---------- Feature cards detail ---------- */
-  const FEATURE_DETAILS = {
-    clarity:
-      "<p><strong>Clarity check, first.</strong> Before any argument starts, a lightweight model scores the topic from 0–1 for debuggability. Scores under 0.72 trigger 1–3 clarifying questions and a rewritten, tightly framed topic. This avoids burning rounds on vague prompts like “is remote work good?”</p>",
-    temp:
-      "<p><strong>Temperature that shifts.</strong> Early rounds run warmer (~0.85) so agents explore angles. Temperature decays linearly toward ~0.30 by the final round, so closing arguments stay precise instead of wandering.</p>",
-    stop:
-      "<p><strong>Early stop, gated twice.</strong> The judge may only end the debate when <em>both</em> conditions hold: the configured minimum rounds have completed <em>and</em> confidence is at least 0.82. Either condition alone is not enough — enforced in code, not just the prompt.</p>",
-    minrounds:
-      "<p><strong>Minimum rounds.</strong> A hard floor (default 4) prevents the judge from calling a winner after a single lucky exchange. You control the floor via <code>--min-rounds</code>.</p>",
-    roles:
-      "<p><strong>Real opponent awareness.</strong> Message roles are remapped so each agent sees its own prior turns as assistant messages and the opponent’s (and judge’s) turns as user messages. That framing is what makes rebuttals engage the other side instead of continuing a monologue.</p>",
-    transcript:
-      "<p><strong>Full transcript, saved.</strong> Every Pro/Con turn, every judge checkpoint, the final verdict, and a summary table are written to a Markdown file. Partial runs are saved as <code>*_PARTIAL.md</code> if something fails mid-debate.</p>",
+  var featureContent = {
+    clarity: { title: 'Clarity check, first', body: 'Before a single argument is made, the topic gets scored 0.0–1.0 by a dedicated pass. Below 0.72, the system generates 1–3 targeted clarifying questions — "too broad," "not actually debatable," "bundles two questions" — and rewrites the topic into one clear, debatable sentence before the debate starts. This alone prevents most wasted runs.' },
+    temp: { title: 'Temperature that shifts', body: 'temp = 0.85 − (progress × 0.55), clamped to [0.30, 0.85]. Round one runs hot and exploratory so agents can range wide; by the final allowed round, temperature has dropped toward 0.30 so arguments tighten up instead of wandering.' },
+    stop: { title: 'One verdict, no peeking', body: 'The judge is completely absent while Pro and Con go back and forth — no interim checkpoints, no confidence gate, no early stop, no loop back for "just one more round." Once the last round finishes, the judge reads the entire transcript in a single pass and is required to back Pro or Con — there is no "Draw" option in its schema, so a hedge literally isn\'t a valid response.' },
+    minrounds: { title: 'You set the round count', body: 'You pick how many Pro/Con exchanges happen (default 4) via --rounds. That number runs to completion every time — nothing about the debate\'s length depends on how the argument is going, because nothing is watching it until it\'s over.' },
+    roles: { title: 'Real opponent awareness', body: 'Each agent\'s own prior turns come back to it labeled as its own; everything else — the opponent, the judge — comes back labeled as someone else talking. That distinction is what makes a "rebuttal" actually respond to what was said, instead of each side quietly continuing its own train of thought.' },
+    transcript: { title: 'Full transcript, saved', body: 'Every round, the final verdict, and a Markdown summary table get written to debate_transcripts/debate_YYYYMMDD_HHMMSS_topic.md. If a run fails partway through an API outage, a *_PARTIAL.md file is saved anyway — nothing in progress is silently lost.' }
   };
 
-  const featureGrid = document.getElementById("feature-grid");
-  const featureDetail = document.getElementById("feature-detail");
-  const featureDetailBody = document.getElementById("feature-detail-body");
-  const featureDetailClose = document.getElementById("feature-detail-close");
+  var $detail = $('#feature-detail');
+  var $detailBody = $('#feature-detail-body');
 
-  if (featureGrid && featureDetail && featureDetailBody) {
-    featureGrid.querySelectorAll(".feature-card").forEach(function (card) {
-      card.addEventListener("click", function () {
-        const key = card.getAttribute("data-feature");
-        const html = FEATURE_DETAILS[key];
-        if (!html) return;
+  $('.feature-card').on('click', function () {
+    var key = $(this).data('feature');
+    var data = featureContent[key];
+    if (!data) return;
 
-        featureGrid.querySelectorAll(".feature-card").forEach(function (c) {
-          c.classList.toggle("is-active", c === card);
-        });
-        featureDetailBody.innerHTML = html;
-        featureDetail.classList.remove("hidden");
-      });
-    });
+    var alreadyOpenForThis = $(this).hasClass('is-active') && !$detail.hasClass('is-hidden');
+    $('.feature-card').removeClass('is-active');
 
-    if (featureDetailClose) {
-      featureDetailClose.addEventListener("click", function () {
-        featureDetail.classList.add("hidden");
-        featureGrid.querySelectorAll(".feature-card").forEach(function (c) {
-          c.classList.remove("is-active");
-        });
-      });
+    if (alreadyOpenForThis) { $detail.addClass('is-hidden'); return; }
+
+    $(this).addClass('is-active');
+    $detailBody.html(
+      '<h4 class="feature-detail__title">' + data.title + '</h4>' +
+      '<p class="feature-detail__body">' + data.body + '</p>'
+    );
+    $detail.removeClass('is-hidden');
+  });
+
+  $('#feature-detail-close').on('click', function () {
+    $detail.addClass('is-hidden');
+    $('.feature-card').removeClass('is-active');
+  });
+
+  $('.accordion-item__head').on('click', function () {
+    var $head = $(this);
+    var $body = $head.next('.accordion-item__body');
+    var expanded = $head.attr('aria-expanded') === 'true';
+
+    $('.accordion-item__head').not($head).attr('aria-expanded', 'false');
+    $('.accordion-item__body').not($body).css('max-height', 0);
+
+    $head.attr('aria-expanded', String(!expanded));
+    $body.css('max-height', expanded ? 0 : $body.prop('scrollHeight') + 'px');
+  });
+
+  $('.code-block__copy').on('click', function () {
+    var $btn = $(this);
+    var targetId = $btn.data('copy-target');
+    var text = document.getElementById(targetId).innerText;
+
+    function done() {
+      $btn.text('Copied').addClass('is-copied');
+      setTimeout(function () { $btn.text('Copy').removeClass('is-copied'); }, 1600);
     }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  });
+
+  function fallbackCopy(text, cb) {
+    var $tmp = $('<textarea>').val(text).css({ position: 'fixed', left: '-9999px' }).appendTo('body');
+    $tmp[0].select();
+    try { document.execCommand('copy'); } catch (e) { /* no-op */ }
+    $tmp.remove();
+    cb();
   }
 
-  /* ---------- Accordion ---------- */
-  document.querySelectorAll(".accordion-item__head").forEach(function (head) {
-    head.addEventListener("click", function () {
-      const expanded = head.getAttribute("aria-expanded") === "true";
-      const body = head.nextElementSibling;
-
-      // Close siblings in the same accordion
-      const accordion = head.closest(".accordion");
-      if (accordion) {
-        accordion.querySelectorAll(".accordion-item__head").forEach(function (h) {
-          if (h !== head) {
-            h.setAttribute("aria-expanded", "false");
-            if (h.nextElementSibling) {
-              h.nextElementSibling.classList.remove("is-open");
-            }
-          }
-        });
-      }
-
-      head.setAttribute("aria-expanded", String(!expanded));
-      if (body) {
-        body.classList.toggle("is-open", !expanded);
-      }
-    });
-  });
-
-  /* ---------- Copy buttons ---------- */
-  document.querySelectorAll(".code-block__copy").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      const targetId = btn.getAttribute("data-copy-target");
-      const el = document.getElementById(targetId);
-      if (!el) return;
-      const text = el.textContent || "";
-      navigator.clipboard.writeText(text).then(
-        function () {
-          const original = btn.textContent;
-          btn.textContent = "Copied";
-          setTimeout(function () {
-            btn.textContent = original;
-          }, 1400);
-        },
-        function () {
-          btn.textContent = "Failed";
-          setTimeout(function () {
-            btn.textContent = "Copy";
-          }, 1400);
-        }
-      );
-    });
-  });
-
-  /* ---------- Debate simulator ---------- */
-  const DEBATES = {
+  /* ---- Debate simulator (scripted, client-side only) ---- */
+  var SCRIPTS = {
     remote: {
-      title: "Should companies go fully remote?",
       rounds: [
-        {
-          round: 1,
-          temp: 0.85,
-          confidence: 0,
-          pro: "Fully remote work expands talent pools beyond commuting radius, lowers real-estate overhead, and multiple longitudinal studies report retention gains of 10–25% among knowledge workers who self-select into remote roles. Output per engineer is comparable when async norms and clear ownership are in place.",
-          con: "Those retention figures are heavily skewed toward senior ICs who already have strong networks. Junior onboarding, mentorship density, and serendipitous cross-team collaboration all degrade without physical presence. Companies that went fully remote during 2020–22 later walked back policy for exactly these reasons.",
-        },
-        {
-          round: 2,
-          temp: 0.67,
-          confidence: 0.58,
-          pro: "Hybrid is often marketed as the compromise, but it inherits the worst of both models: office days become meeting marathons, and remote days lose deep-work protection. A deliberate fully-remote design with quarterly co-location can preserve culture without daily commute tax.",
-          con: "Quarterly offsites do not replace the continuous low-bandwidth social fabric that keeps teams aligned. Mentorship of juniors is not a quarterly event; it is daily proximity and overheard problem-solving. Fully remote systematically under-invests in the next generation of talent.",
-          judge: "Early lean toward Con on junior pipeline risk. Confidence 58% — well below the 82% bar. Continuing.",
-        },
-        {
-          round: 3,
-          temp: 0.48,
-          confidence: 0.71,
-          pro: "Companies that treat remote as a product — documented rituals, written decisions, recorded demos — show that junior growth can be engineered. GitLab, Automattic, and others publish public handbooks precisely to make implicit knowledge explicit. The failure mode is lazy remote, not remote itself.",
-          con: "Public handbooks are necessary but not sufficient. They capture process, not tacit craft. Pair-debugging over a shoulder, reading body language in a design review, and informal career coaching remain harder to systematize. The companies cited still struggle with promotion velocity for early-career staff.",
-          judge: "Pro’s ‘remote as product’ framing is strong, but Con’s evidence on promotion velocity is concrete. Confidence 71%. Continuing.",
-        },
-        {
-          round: 4,
-          temp: 0.3,
-          confidence: 0.84,
-          pro: "The decision is not binary for every company. Fully remote is a defensible default for mature product teams with strong writing culture; it is a liability for early-stage teams still inventing their craft. The stronger claim is selective full-remote by function, not a universal mandate.",
-          con: "Even that weaker claim underestimates coordination cost across functions. Product, design, and engineering still need high-bandwidth moments. Selective remote tends to recreate second-class citizenship for whoever is off-site most often.",
-          judge: "Verdict leans Con on a universal ‘fully remote’ mandate; Pro’s refined claim of selective remote by maturity is more defensible. Confidence 84% — stopping.",
-        },
+        { pro: 'Fully remote companies consistently report lower attrition and access a far wider hiring pool — talent isn\'t capped by a commute radius anymore.', con: 'Lower attrition on paper often hides slower onboarding and weaker mentorship for juniors, who learn a huge amount from ambient, in-person exposure.' },
+        { pro: 'Structured onboarding programs close most of that mentorship gap, and the data shows the effect shrinking fast as remote-native tooling matures.', con: 'Structured programs help, but they\'re a cost most companies underinvest in — the studies showing improvement come from well-funded outliers, not the median remote company.' },
+        { pro: 'Even taking the median case, remote-first firms show equal or better output per employee once ramp-up periods are normalized for.', con: 'Normalizing away the ramp-up period is exactly the disagreement — that ramp-up cost is real and it\'s the thing junior hires actually pay.' },
+        { pro: 'The hiring-pool advantage alone compounds every year — over time it outweighs a ramp-up cost that\'s highest only in a junior\'s first few months.', con: 'An advantage that compounds "over time" doesn\'t help the junior hire who\'s struggling right now. The short-term cost is exactly when people quit.' }
       ],
-      verdict: {
-        winner: "Con (with nuance)",
-        confidence: "84%",
-        summary:
-          "A blanket fully-remote policy is hard to defend given junior pipeline and tacit-knowledge costs. Selective remote for mature teams with deliberate written culture is a stronger position than either pure extreme.",
-      },
+      verdict: { winner: 'Con', conf: 0.68, reasoning: 'Pro never directly answered the mentorship-gap point — it kept shifting to long-run efficiency instead of engaging with what happens to a junior hire in month one. Con\'s case on that specific point held up across all four rounds.' }
     },
     junior: {
-      title: "Should AI agents replace junior developers by 2028?",
       rounds: [
-        {
-          round: 1,
-          temp: 0.85,
-          confidence: 0,
-          pro: "Coding agents already complete well-scoped tickets faster than many juniors. By 2028, cost-per-feature and time-to-merge will favor agent-heavy workflows. Companies that still staff large junior cohorts will carry training overhead competitors no longer need.",
-          con: "Juniors are not only ticket-closers; they are the apprenticeship pipeline that produces seniors. Replacing them with agents creates a hollow middle in five to seven years. Agents also fail unpredictably on ambiguous requirements — exactly where junior judgment is trained.",
-        },
-        {
-          round: 2,
-          temp: 0.67,
-          confidence: 0.61,
-          pro: "Apprenticeship can shift: juniors supervise agents, review diffs, and learn by editing machine output rather than writing from a blank file. The role changes; it does not disappear. Volume of practice may even increase.",
-          con: "Supervising agents still requires enough craft to notice when the agent is wrong. If juniors never struggle through the hard parts themselves, they never build that craft. We risk a generation that can prompt but cannot debug novel failures.",
-          judge: "Core tension is pipeline vs productivity. Confidence 61%. Continuing.",
-        },
-        {
-          round: 3,
-          temp: 0.48,
-          confidence: 0.74,
-          pro: "Markets do not subsidize training indefinitely. If agents deliver 80% of junior output at 10% of the cost, pure economic pressure will shrink junior headcount regardless of long-term pipeline concerns. Firms will externalize the training problem.",
-          con: "Externalizing training is a collective-action failure. Industry still needs seniors. The firms that keep a deliberate junior track — even smaller — will own the talent market later. ‘Replace’ is the wrong verb; ‘reshape and reduce’ is more accurate, and not by 2028 at scale.",
-          judge: "Pro’s economics are real; Con’s timeline skepticism is also real. Confidence 74%. Continuing.",
-        },
-        {
-          round: 4,
-          temp: 0.3,
-          confidence: 0.86,
-          pro: "By 2028 the replacement will be partial: fewer pure junior tickets, more agent-augmented roles. Full replacement of the junior layer is overstated, but material contraction is likely.",
-          con: "Agreed that full replacement is overstated. The useful debate is how to redesign junior work so agents accelerate learning instead of short-circuiting it. That is a product and process problem, not a headcount cliff in three years.",
-          judge: "Both sides converged: full replacement by 2028 is unlikely; material role change is likely. Confidence 86% — stopping.",
-        },
+        { pro: 'By 2028, agentic coding tools will handle the bulk of well-specified junior-level tickets faster and more cheaply than a new hire ramping up.', con: 'Junior developers aren\'t hired only for ticket throughput — they\'re how a company grows its future senior engineers. Replace them and that pipeline just disappears.' },
+        { pro: 'Companies can hire fewer, more senior engineers directly and use agents to cover the volume work juniors used to absorb — the pipeline problem is solvable differently.', con: '"Hire senior instead" assumes a labor market that already has enough senior engineers. It doesn\'t — it has the number that junior pipelines produced.' },
+        { pro: 'Even granting the market point, full replacement by 2028 is a much stronger claim than what the evidence supports today — partial augmentation is far more likely than replacement.', con: 'Agreed that "full replacement" is the overreach here — the honest claim is agents will shrink junior hiring significantly, not eliminate it.' },
+        { pro: 'If we\'re both landing on "significant shrinkage, not elimination," then the original framing of the topic was simply too strong to defend as stated.', con: 'Right — which is itself a case against the motion as written. "Replace" was the wrong verb for what\'s actually going to happen.' }
       ],
-      verdict: {
-        winner: "Con (on the strong claim)",
-        confidence: "86%",
-        summary:
-          "AI agents will reshape junior work and likely reduce pure ticket volume, but wholesale replacement of the junior layer by 2028 is not supported. The live problem is redesigning apprenticeship around agents, not eliminating it.",
-      },
+      verdict: { winner: 'Con', conf: 0.63, reasoning: 'Both sides ended up agreeing the literal claim — full replacement by 2028 — doesn\'t hold. Since Con was arguing against that literal claim, Con wins on the topic as stated, even though the debate matured into a more nuanced shared position.' }
     },
     fourday: {
-      title: "Should the standard work week be four days?",
       rounds: [
-        {
-          round: 1,
-          temp: 0.85,
-          confidence: 0,
-          pro: "Trials in Iceland, the UK, and several US companies report equal or higher output on four-day schedules, with large gains in retention and reported well-being. Knowledge work is not linear with hours; fatigue and context-switching waste a large share of the fifth day.",
-          con: "Successful trials are self-selected and often paired with process redesign that would help on five days too. Customer-facing, healthcare, and ops roles cannot simply drop a day without coverage cost. A universal four-day standard ignores sector differences.",
-        },
-        {
-          round: 2,
-          temp: 0.67,
-          confidence: 0.55,
-          pro: "The standard need not mean identical calendars for every role. A four-day default for knowledge work, with staggered coverage elsewhere, still shifts the norm and forces intentional prioritization. Meetings shrink when Friday is gone.",
-          con: "Staggered coverage recreates fairness problems: who gets the four-day schedule, and who covers weekends or peaks? Without careful design, four-day becomes a perk for some and a burden for others.",
-          judge: "Equity and sector fit are the open questions. Confidence 55%. Continuing.",
-        },
-        {
-          round: 3,
-          temp: 0.48,
-          confidence: 0.72,
-          pro: "Companies already differentiate benefits by role. Four-day as a default for eligible roles is no more unfair than remote eligibility. The alternative is status-quo overtime culture that quietly burns people out.",
-          con: "Burnout is real, but the lever may be workload and staffing, not calendar length. Compressing five days of expectations into four without cutting scope is a common failure mode of poorly run trials.",
-          judge: "Pro wins on well-being evidence; Con’s warning on scope compression is important. Confidence 72%. Continuing.",
-        },
-        {
-          round: 4,
-          temp: 0.3,
-          confidence: 0.83,
-          pro: "The claim should be: four-day should become a widely available option with explicit scope reduction, not a blunt mandate. Where output is measurable and meetings are the main tax, the case is strong.",
-          con: "Narrowed that way, the claim is more defensible. A universal standard still overreaches. Pilot, measure, and expand where evidence holds — especially outside pure knowledge work.",
-          judge: "Convergence on optional, measured adoption over mandate. Confidence 83% — stopping.",
-        },
+        { pro: 'Multiple large-scale trials show four-day weeks hold productivity steady while measurably improving retention and reported wellbeing.', con: 'Those trials mostly ran at companies that opted in — self-selection means we\'re seeing the effect at firms already primed to make it work.' },
+        { pro: 'Even accounting for selection bias, the trials that included mandatory rather than opt-in participation show a similar, if smaller, effect.', con: 'A smaller effect in mandatory settings is itself the point — the size of the benefit depends heavily on industry, and it doesn\'t generalize evenly across all sectors.' },
+        { pro: 'That narrower claim is the fair one to make: four-day weeks help broadly, with the size of the benefit depending on how easily the work compresses.', con: 'Agreed — framed that way, it\'s not a universal switch to flip, it\'s a lever whose effect size companies need to test for their own context.' },
+        { pro: 'A lever worth testing everywhere is still a strong case for making it the standard default, with room for exceptions.', con: 'Making something the default is a much bigger claim than "worth testing" — that\'s exactly the gap between what the evidence shows and what the motion asks for.' }
       ],
-      verdict: {
-        winner: "Pro (narrowed claim)",
-        confidence: "83%",
-        summary:
-          "A universal four-day mandate is too blunt. As a default option for knowledge-work roles, paired with real scope cuts and measurement, the evidence for well-being and retention is solid enough to justify wider adoption.",
-      },
-    },
+      verdict: { winner: 'Pro', conf: 0.57, reasoning: 'This was close — Con\'s industry-variance point is real and never fully went away. But Pro\'s case survived it: even Con\'s own framing ("a lever worth testing") supports moving toward four days as the default starting point, which is what the motion actually asked.' }
+    }
   };
 
-  const simTopic = document.getElementById("sim-topic");
-  const simStart = document.getElementById("sim-start");
-  const simRound = document.getElementById("sim-round");
-  const simTemp = document.getElementById("sim-temp");
-  const simConfFill = document.getElementById("sim-confidence-fill");
-  const simTranscript = document.getElementById("sim-transcript");
-  const simVerdict = document.getElementById("sim-verdict");
+  var TEMP_START = 0.85, TEMP_END = 0.30;
+  var simRunning = false;
 
-  let simRunning = false;
-  let simTimer = null;
+  var $transcript = $('#sim-transcript');
+  var $round = $('#sim-round');
+  var $temp = $('#sim-temp');
+  var $confFill = $('#sim-confidence-fill');
+  var $verdict = $('#sim-verdict');
+  var $startBtn = $('#sim-start');
 
-  function setMeta(round, temp, conf) {
-    if (simRound) simRound.textContent = round == null ? "—" : String(round);
-    if (simTemp) simTemp.textContent = temp == null ? "—" : Number(temp).toFixed(2);
-    if (simConfFill) {
-      const pct = Math.max(0, Math.min(100, (conf || 0) * 100));
-      simConfFill.style.width = pct + "%";
-    }
+  function temperatureForStep(stepIndex, totalSteps) {
+    var progress = stepIndex / Math.max(totalSteps - 1, 1);
+    var t = TEMP_START - progress * (TEMP_START - TEMP_END);
+    return Math.max(TEMP_END, Math.min(TEMP_START, t)).toFixed(2);
   }
 
-  function appendEntry(role, round, text) {
-    if (!simTranscript) return;
-    const entry = document.createElement("div");
-    entry.className = "sim-entry";
-    entry.innerHTML =
-      '<div class="sim-entry__head">' +
-      '<span class="sim-entry__role sim-entry__role--' +
-      role +
-      '">' +
-      role.charAt(0).toUpperCase() +
-      role.slice(1) +
-      "</span>" +
-      '<span class="sim-entry__round">Round ' +
-      round +
-      "</span>" +
-      "</div>" +
-      '<p class="sim-entry__body">' +
-      text +
-      "</p>";
-    simTranscript.appendChild(entry);
-    simTranscript.scrollTop = simTranscript.scrollHeight;
+  function typeLine($container, speaker, text, cls, cb) {
+    var $line = $('<div>').addClass('sim-line sim-line--' + cls).appendTo($container);
+    $('<div>').addClass('sim-line__speaker').text(speaker).appendTo($line);
+    var $text = $('<div>').addClass('sim-line__text').appendTo($line);
+    var $cursor = $('<span>').addClass('sim-cursor').appendTo($text);
+
+    var i = 0;
+    var speed = 9;
+    (function type() {
+      if (!simRunning) { $text.text(text); $cursor.remove(); cb && cb(); return; }
+      i += Math.ceil(Math.random() * 2);
+      $text.text(text.slice(0, i));
+      $text.append($cursor);
+      $container.scrollTop($container[0].scrollHeight);
+      if (i < text.length) { setTimeout(type, speed); } else { $cursor.remove(); cb && cb(); }
+    })();
   }
 
-  function runDebate(key) {
-    const data = DEBATES[key];
-    if (!data || !simTranscript) return;
+  function wait(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
 
+  async function runSimulation(scriptKey) {
+    if (simRunning) return;
     simRunning = true;
-    if (simStart) {
-      simStart.disabled = true;
-      simStart.textContent = "Running…";
-    }
-    if (simVerdict) {
-      simVerdict.classList.add("hidden");
-      simVerdict.innerHTML = "";
-    }
-    simTranscript.innerHTML = "";
-    setMeta(null, null, 0);
+    $startBtn.prop('disabled', true).text('Debating…');
 
-    let i = 0;
+    var script = SCRIPTS[scriptKey];
+    var totalRounds = script.rounds.length;
+    $transcript.empty();
+    $verdict.addClass('is-hidden').empty();
+    $confFill.css('width', '0%');
+    $round.text('1');
+    $temp.text(temperatureForStep(0, totalRounds));
 
-    function next() {
-      if (i >= data.rounds.length) {
-        // Verdict
-        const v = data.verdict;
-        if (simVerdict) {
-          simVerdict.innerHTML =
-            "<h3>Verdict — " +
-            v.winner +
-            "</h3><p><strong>Confidence:</strong> " +
-            v.confidence +
-            "</p><p>" +
-            v.summary +
-            "</p>";
-          simVerdict.classList.remove("hidden");
-        }
-        simRunning = false;
-        if (simStart) {
-          simStart.disabled = false;
-          simStart.textContent = "Start debate";
-        }
-        return;
-      }
+    // Rounds run to completion with no judge involvement at all — the
+    // confidence bar stays empty on purpose, because nothing is being
+    // scored yet.
+    for (var i = 0; i < totalRounds; i++) {
+      var roundNum = i + 1;
+      $round.text(roundNum);
+      $temp.text(temperatureForStep(i, totalRounds));
 
-      const r = data.rounds[i];
-      setMeta(r.round, r.temp, r.confidence);
-
-      // Pro
-      appendEntry("pro", r.round, r.pro);
-
-      simTimer = setTimeout(function () {
-        // Con
-        appendEntry("con", r.round, r.con);
-
-        simTimer = setTimeout(function () {
-          if (r.judge) {
-            appendEntry("judge", r.round, r.judge);
-            setMeta(r.round, r.temp, r.confidence);
-          }
-          i += 1;
-          simTimer = setTimeout(next, 700);
-        }, 900);
-      }, 900);
+      await new Promise(function (res) { typeLine($transcript, 'Pro · Round ' + roundNum, script.rounds[i].pro, 'pro', res); });
+      await wait(250);
+      await new Promise(function (res) { typeLine($transcript, 'Con · Round ' + roundNum, script.rounds[i].con, 'con', res); });
+      await wait(400);
     }
 
-    next();
+    // Only now — once, after every round — does the judge speak.
+    await wait(300);
+    var v = script.verdict;
+    var confPct = Math.round(v.conf * 100);
+    var judgeText = 'Backs ' + v.winner + ', ' + confPct + '% confidence — ' + v.reasoning;
+    await new Promise(function (res) { typeLine($transcript, 'Judge · after round ' + totalRounds + ', once', judgeText, 'judge', res); });
+    $confFill.css('width', confPct + '%');
+    await wait(400);
+
+    var winnerClass = v.winner === 'Pro' ? 'text-pro' : 'text-con';
+    $verdict.removeClass('is-hidden').html(
+      '<div class="sim-verdict__title">Verdict: <span class="' + winnerClass + '">' + v.winner + '</span> — ' + confPct + '% confidence</div>' +
+      '<p class="sim-verdict__body">Decided once, after all ' + totalRounds + ' rounds, with no draw available as an option. Full transcript would be saved to <code>debate_transcripts/</code>.</p>'
+    );
+
+    simRunning = false;
+    $startBtn.prop('disabled', false).text('Start debate');
   }
 
-  if (simStart) {
-    simStart.addEventListener("click", function () {
-      if (simRunning) return;
-      const key = simTopic ? simTopic.value : "remote";
-      runDebate(key);
-    });
-  }
-})();
+  $startBtn.on('click', function () {
+    runSimulation($('#sim-topic').val());
+  });
 
+});
 </script>
+
 </body>
 </html>
